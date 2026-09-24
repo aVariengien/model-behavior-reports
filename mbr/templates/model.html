@@ -28,7 +28,7 @@
 
 {% block body %}
 <nav class="wrap crumbs">
-  <a class="home" href="/">Model Behavior Reports</a>
+  <a class="home" href="/">{% include "logo.svg" %}Model Behavior Reports</a>
   {% for m in models %}<a class="chip{{ ' on' if m.slug == model.slug }}" style="--c:{{ m.color }}" href="/model/{{ m.slug }}/">{{ m.name }}</a>{% endfor %}
 </nav>
 <header class="wrap mh" style="--c:{{ model.color }}">

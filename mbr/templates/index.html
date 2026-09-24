@@ -75,7 +75,7 @@
 {% block body %}
 <header class="masthead wrap">
   <nav class="topnav"><a href="/about/">About</a><a href="{{ github }}" target="_blank" rel="noopener">GitHub</a></nav>
-  <h1 class="brand">Model Behavior Reports</h1>
+  <h1 class="brand">{% include "logo.svg" %}Model Behavior Reports</h1>
   <p class="dek">Crowdsourced LLM behaviors from X. Built from the <a href="https://www.community-archive.org" target="_blank" rel="noopener">Community Archive</a>.</p>
   <p class="meta">The collection contains {{ '{:,}'.format(n_reports) }} reports on {{ n_models }} models by {{ '{:,}'.format(n_people) }} accounts. <a class="raw" href="/llms.txt">Raw data for LLMs ↗</a></p>
 </header>

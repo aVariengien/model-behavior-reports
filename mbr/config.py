@@ -76,6 +76,10 @@ BASE_MODELS = [
          aliases=["opus 5.5", "opus5.5", "claude-opus-5-5"], generic=["claude opus"]),
     dict(slug="claude-fable-5-1", name="Claude Fable 5.1", lab="anthropic", released="2026-07-09",
          aliases=["fable 5.1", "fable5.1", "claude-fable-5-1"], generic=["claude fable"]),
+    dict(slug="claude-opus-5", name="Claude Opus 5", lab="anthropic", released="2026-07-24",
+         aliases=["opus 5", "opus5", "claude-opus-5"], generic=["claude opus", "opus"]),
+    dict(slug="claude-fable-5", name="Claude Fable 5", lab="anthropic", released="2026-06-09",
+         aliases=["fable 5", "fable5", "claude-fable-5"], generic=["claude fable", "fable"]),
     dict(slug="claude-sonnet-5", name="Claude Sonnet 5", lab="anthropic", released="2026-04-21",
          aliases=["sonnet 5", "sonnet5", "claude-sonnet-5"], generic=["claude sonnet"]),
     dict(slug="gpt-6-sol", name="GPT-6 Sol", lab="openai", released="2026-09-15",
@@ -151,12 +155,27 @@ def load_models():
     MODELS, MODEL_BY_SLUG = models, by_slug
     MODEL_PATTERNS = {m["slug"]: re.compile("|".join(_alias_pattern(a) for a in m["aliases"]), re.I)
                       for m in models if m["aliases"]}
-    # Family name -> (pattern, [(released, slug)] newest first).
-    families: dict[str, list] = {}
+    # Models sharing any family name form one family ("opus" and "claude opus" both point at
+    # Opus 5 and 5.5): a hit on any of its names resolves to the family's newest version out.
+    parent = {m["slug"]: m["slug"] for m in models}
+
+    def root(x):
+        while parent[x] != x:
+            x = parent[x]
+        return x
+
+    owner: dict[str, str] = {}
     for m in models:
         for g in m["generic"]:
-            families.setdefault(g.lower(), []).append((m["released"], m["slug"]))
-    GENERIC = [(re.compile(_generic_pattern(g), re.I), sorted(v, reverse=True)) for g, v in families.items()]
+            g = g.lower()
+            if g in owner:
+                parent[root(m["slug"])] = root(owner[g])
+            owner.setdefault(g, m["slug"])
+    family = {}
+    for m in models:
+        family.setdefault(root(m["slug"]), []).append((m["released"], m["slug"]))
+    GENERIC = [(re.compile(_generic_pattern(g), re.I), sorted(family[root(slug)], reverse=True))
+               for g, slug in owner.items()]
 
 
 load_models()

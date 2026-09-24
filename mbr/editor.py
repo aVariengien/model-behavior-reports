@@ -27,7 +27,7 @@ def _start_rekey() -> str:
     subprocess.run([
         "systemd-run", f"--unit={REKEY_UNIT}", "--collect",
         "--property=EnvironmentFile=/opt/modelbehavior/secrets.env",
-        f"--setenv=MBR_ROOT={config.ROOT}", f"--setenv=MBR_OUT={config.OUT_DIR}",
+        f"--setenv=MBR_ROOT={config.ROOT}", f"--setenv=MBR_OUT={config.OUT_DIR}", "--setenv=PYTHONUNBUFFERED=1",
         f"--working-directory={config.ROOT}", str(config.ROOT / ".venv/bin/mbr"), "rekey",
     ], check=True, capture_output=True)
     return "started"

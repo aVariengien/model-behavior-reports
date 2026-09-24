@@ -25,6 +25,8 @@ def main():
     sub.add_parser("serve-editor", help="keyword-editing API for /status/ (127.0.0.1:3004)")
     sub.add_parser("check-models", help="look for new models on OpenRouter now")
     sub.add_parser("rematch", help="re-run keyword matching on stored reports")
+    rs = sub.add_parser("rescan", help="re-scan recent tweets for keyword matches (no grading)")
+    rs.add_argument("--days", type=int, default=config.WINDOW_DAYS)
     r = sub.add_parser("rekey", help="after keyword edits: rematch, rescan, grade, rebuild")
     r.add_argument("--days", type=int, default=config.WINDOW_DAYS)
     args = p.parse_args()
@@ -77,6 +79,8 @@ def main():
             build.build(con)
         elif args.cmd == "rematch":
             collect.rematch(con)
+        elif args.cmd == "rescan":
+            collect.rescan(con, args.days)
         elif args.cmd == "rekey":
             # Edits saved while a re-key runs leave a flag; loop until none is pending.
             pending = config.DB_PATH.parent / ".rekey_pending"
