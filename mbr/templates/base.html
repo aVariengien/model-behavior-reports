@@ -180,8 +180,6 @@ footer p { margin: 4px 0; }
 <body>
 {% block body %}{% endblock %}
 <footer class="wrap">
-  <p>Reports are tweets that mention a tracked model, graded by {{ classifier }} for whether they describe a behaviour and how interesting it is. Model summaries are written by {{ summarizer }} from those reports.</p>
-  <p>Data from the <a href="https://www.community-archive.org" target="_blank" rel="noopener">Community Archive</a>, an open, opt-in archive of X. Rebuilt every hour.</p>
   <p><a href="/about/">About</a> · <a href="{{ github }}" target="_blank" rel="noopener">GitHub</a> · <a href="/llms.txt">llms.txt</a> · made by <a href="https://alexandrevariengien.com" target="_blank" rel="noopener">Alexandre Variengien</a></p>
 </footer>
 <script>
