@@ -177,7 +177,7 @@ def build(con, out_dir: Path = config.OUT_DIR):
     for row in q(f"SELECT t.username, MAX(t.display_name) name, MAX(CASE WHEN t.avatar LIKE 'http%' THEN t.avatar END) avatar, COUNT(DISTINCT r.tweet_id) n, "
                  f"COUNT(DISTINCT j.value) nm FROM reports r JOIN tweets t USING(tweet_id), json_each(r.models) j "
                  f"WHERE {SHOWN} AND t.username IS NOT NULL GROUP BY lower(t.username) "
-                 f"ORDER BY nm DESC, n DESC LIMIT 5", config.MIN_SCORE):
+                 f"ORDER BY 10 * COUNT(DISTINCT j.value) + COUNT(DISTINCT r.tweet_id) DESC LIMIT 5", config.MIN_SCORE):
         reporters.append(dict(row, avatar=avatar(row["avatar"], "200x200")))
 
     total = q(f"SELECT COUNT(*) n, COUNT(DISTINCT lower(t.username)) people FROM reports r "
