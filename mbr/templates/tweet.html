@@ -25,7 +25,7 @@
     {% if m.type == 'animated_gif' %}autoplay muted loop{% else %}controls{% endif %}
     {% if m.w and m.h %}width="{{ m.w }}" height="{{ m.h }}"{% endif %}></video>
   {% else %}
-  <a href="{{ t.url if m.type != 'photo' else m.url ~ '?name=large' }}" target="_blank" rel="noopener">
+  <a href="{{ t.url if m.type != 'photo' else m.url ~ '?name=large' }}" target="_blank" rel="noopener"{% if m.type == 'photo' %} class="ph"{% endif %}>
     <img src="{{ m.url }}?name=small" alt="" loading="lazy" {% if m.w and m.h %}width="{{ m.w }}" height="{{ m.h }}"{% endif %}>
     {% if m.type != 'photo' %}<span class="play"></span>{% endif %}
   </a>
