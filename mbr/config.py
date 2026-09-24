@@ -85,6 +85,8 @@ BASE_MODELS = [
          aliases=["sonnet 5", "sonnet5", "claude-sonnet-5"], generic=["claude sonnet"]),
     dict(slug="gpt-6-sol", name="GPT-6 Sol", lab="openai", released="2026-09-15",
          aliases=["gpt-6 sol", "gpt6 sol", "gpt 6 sol", "gpt-6-sol-pro"], generic=["gpt sol", "sol pro"]),
+    dict(slug="gpt-5-6-sol", name="GPT-5.6 Sol", lab="openai", released="2026-07-09",
+         aliases=["gpt-5.6 sol", "gpt5.6 sol", "gpt 5.6 sol", "5.6 sol", "gpt-5.6-sol-pro"], generic=["gpt sol", "sol pro"]),
     dict(slug="gpt-6-luna", name="GPT-6 Luna", lab="openai", released="2026-09-19",
          aliases=["gpt-6 luna", "gpt6 luna", "gpt 6 luna"], generic=["gpt luna", "luna pro"]),
     dict(slug="gpt-6-astra", name="GPT-6 Astra", lab="openai", released="2026-09-02",
@@ -93,6 +95,10 @@ BASE_MODELS = [
          aliases=["gpt-5.6 terra", "gpt5.6 terra", "5.6 terra"], generic=["gpt terra", "terra pro"]),
     dict(slug="gemini-3-8-flash", name="Gemini 3.8 Flash", lab="google", released="2026-08-31",
          aliases=["gemini 3.8", "gemini3.8", "gemini-3.8-flash"], generic=["gemini flash"]),
+    dict(slug="gemini-3-5-flash", name="Gemini 3.5 Flash", lab="google", released="2026-05-19",
+         aliases=["gemini 3.5 flash", "gemini3.5 flash", "gemini-3.5-flash"], generic=["gemini flash"]),
+    dict(slug="gemini-3-1-pro", name="Gemini 3.1 Pro", lab="google", released="2026-02-19",
+         aliases=["gemini 3.1 pro", "gemini3.1 pro", "gemini-3.1-pro"], generic=["gemini pro"]),
     dict(slug="grok-4-7", name="Grok 4.7", lab="xai", released="2026-08-12",
          aliases=["grok 4.7", "grok4.7", "grok-4-7"], generic=[]),
     dict(slug="deepseek-v4", name="DeepSeek V4", lab="deepseek", released="2026-03-30",
@@ -188,7 +194,12 @@ def match_models(text: str, created_at: str | None = None) -> list[str]:
     text = text or ""
     found = {slug for slug, pat in MODEL_PATTERNS.items() if pat.search(text)}
     day = (created_at or "9999")[:10]
+    explicit = set(found)
     for pat, versions in GENERIC:
+        # A tweet that names a version of this family explicitly ("GPT-5.6 Sol Pro") isn't
+        # also a family-name mention of another version ("sol pro").
+        if explicit & {slug for _, slug in versions}:
+            continue
         if pat.search(text):
             slug = next((s for released, s in versions if released <= day), None)
             if slug:
