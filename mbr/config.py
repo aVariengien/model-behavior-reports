@@ -67,75 +67,110 @@ LABS = {
 
 # Pro / non-Pro variants are merged into one entry. Aliases are matched
 # case-insensitively; spaces, hyphens and underscores are interchangeable.
+# `aliases` name the exact version and always count. `generic` are family names without a
+# version ("claude fable"): they count for this model only in tweets posted after `released`
+# (the newest tracked version at the time wins), and never when followed by another version.
+# `released` = earlier of the OpenRouter listing and the 5th explicit mention in the archive.
 BASE_MODELS = [
-    dict(slug="claude-opus-5-5", name="Claude Opus 5.5", lab="anthropic",
-         aliases=["opus 5.5", "opus5.5", "claude-opus-5-5"]),
-    dict(slug="claude-fable-5-1", name="Claude Fable 5.1", lab="anthropic",
-         aliases=["fable 5.1", "fable5.1", "claude fable", "claude-fable-5-1"]),
-    dict(slug="claude-sonnet-5", name="Claude Sonnet 5", lab="anthropic",
-         aliases=["sonnet 5", "sonnet5", "claude-sonnet-5"]),
-    dict(slug="gpt-6-sol", name="GPT-6 Sol", lab="openai",
-         aliases=["gpt-6 sol", "gpt6 sol", "gpt sol", "gpt-6-sol-pro", "sol pro"]),
-    dict(slug="gpt-6-luna", name="GPT-6 Luna", lab="openai",
-         aliases=["gpt-6 luna", "gpt6 luna", "gpt luna", "luna pro"]),
-    dict(slug="gpt-6-astra", name="GPT-6 Astra", lab="openai",
-         aliases=["gpt-6 astra", "gpt6 astra", "gpt astra", "astra pro"]),
-    dict(slug="gpt-5-6-terra", name="GPT-5.6 Terra", lab="openai",
-         aliases=["gpt terra", "gpt-5.6 terra", "gpt5.6 terra", "5.6 terra", "terra pro"]),
-    dict(slug="gemini-3-8-flash", name="Gemini 3.8 Flash", lab="google",
-         aliases=["gemini 3.8", "gemini3.8", "gemini-3.8-flash"]),
-    dict(slug="grok-4-7", name="Grok 4.7", lab="xai",
-         aliases=["grok 4.7", "grok4.7", "grok-4-7"]),
-    dict(slug="deepseek-v4", name="DeepSeek V4", lab="deepseek",
-         aliases=["deepseek v4", "deepseekv4", "deepseek v4.1", "deepseek-v4-pro", "deepseek v4 pro"]),
-    dict(slug="kimi-k3", name="Kimi K3", lab="moonshot",
-         aliases=["kimi k3", "kimik3", "kimi-k3"]),
-    dict(slug="qwen-3-8", name="Qwen3.8 Max", lab="qwen",
-         aliases=["qwen3.8", "qwen 3.8", "qwen-3.8", "qwen3.8 max"]),
-    dict(slug="glm-5-3", name="GLM 5.3", lab="zai",
-         aliases=["glm 5.3", "glm5.3", "glm-5-3"]),
-    dict(slug="muse-spark", name="Muse Spark 1.3", lab="meta",
-         aliases=["muse spark", "musespark", "muse-spark"]),
-    dict(slug="mimo-v2-6", name="MiMo V2.6", lab="xiaomi",
-         aliases=["mimo v2.6", "mimo-v2.6", "mimo 2.6", "mimo v2.6 pro"]),
+    dict(slug="claude-opus-5-5", name="Claude Opus 5.5", lab="anthropic", released="2026-09-20",
+         aliases=["opus 5.5", "opus5.5", "claude-opus-5-5"], generic=["claude opus"]),
+    dict(slug="claude-fable-5-1", name="Claude Fable 5.1", lab="anthropic", released="2026-07-09",
+         aliases=["fable 5.1", "fable5.1", "claude-fable-5-1"], generic=["claude fable"]),
+    dict(slug="claude-sonnet-5", name="Claude Sonnet 5", lab="anthropic", released="2026-04-21",
+         aliases=["sonnet 5", "sonnet5", "claude-sonnet-5"], generic=["claude sonnet"]),
+    dict(slug="gpt-6-sol", name="GPT-6 Sol", lab="openai", released="2026-09-15",
+         aliases=["gpt-6 sol", "gpt6 sol", "gpt 6 sol", "gpt-6-sol-pro"], generic=["gpt sol", "sol pro"]),
+    dict(slug="gpt-6-luna", name="GPT-6 Luna", lab="openai", released="2026-09-19",
+         aliases=["gpt-6 luna", "gpt6 luna", "gpt 6 luna"], generic=["gpt luna", "luna pro"]),
+    dict(slug="gpt-6-astra", name="GPT-6 Astra", lab="openai", released="2026-09-02",
+         aliases=["gpt-6 astra", "gpt6 astra", "gpt 6 astra"], generic=["gpt astra", "astra pro"]),
+    dict(slug="gpt-5-6-terra", name="GPT-5.6 Terra", lab="openai", released="2026-06-30",
+         aliases=["gpt-5.6 terra", "gpt5.6 terra", "5.6 terra"], generic=["gpt terra", "terra pro"]),
+    dict(slug="gemini-3-8-flash", name="Gemini 3.8 Flash", lab="google", released="2026-08-31",
+         aliases=["gemini 3.8", "gemini3.8", "gemini-3.8-flash"], generic=["gemini flash"]),
+    dict(slug="grok-4-7", name="Grok 4.7", lab="xai", released="2026-08-12",
+         aliases=["grok 4.7", "grok4.7", "grok-4-7"], generic=[]),
+    dict(slug="deepseek-v4", name="DeepSeek V4", lab="deepseek", released="2026-03-30",
+         aliases=["deepseek v4", "deepseekv4", "deepseek v4.1", "deepseek-v4-pro", "deepseek v4 pro"], generic=[]),
+    dict(slug="kimi-k3", name="Kimi K3", lab="moonshot", released="2026-06-13",
+         aliases=["kimi k3", "kimik3", "kimi-k3"], generic=[]),
+    dict(slug="qwen-3-8", name="Qwen3.8 Max", lab="qwen", released="2026-07-19",
+         aliases=["qwen3.8", "qwen 3.8", "qwen-3.8", "qwen3.8 max"], generic=[]),
+    dict(slug="glm-5-3", name="GLM 5.3", lab="zai", released="2026-07-25",
+         aliases=["glm 5.3", "glm5.3", "glm-5-3"], generic=[]),
+    dict(slug="muse-spark", name="Muse Spark 1.3", lab="meta", released="2026-09-02",
+         aliases=["muse spark 1.3", "spark 1.3", "muse-spark-1.3"], generic=["muse spark"]),
+    dict(slug="mimo-v2-6", name="MiMo V2.6", lab="xiaomi", released="2026-09-21",
+         aliases=["mimo v2.6", "mimo-v2.6", "mimo 2.6", "mimo v2.6 pro"], generic=[]),
 ]
-# Models added automatically from OpenRouter (see newmodels.py) live next to the DB:
-# a list of full model dicts, or {"slug": <existing>, "aliases": [...]} to extend one.
+# Models added automatically from OpenRouter (see newmodels.py) and keyword edits made on
+# /status/ live next to the DB, in a list of entries:
+#   {"slug", "name", "lab", "released", "aliases", "generic"}  a new model
+#   {"slug", "aliases": [...]}                                 extra aliases for a model
+#   {"slug", "replace": true, "aliases", "generic", "released"}  hand edit (wins)
 EXTRA_MODELS_PATH = DB_PATH.parent / "models.json"
 
 
-def _alias_pattern(alias: str) -> str:
+def _alias_body(alias: str) -> str:
     parts = re.split(r"[\s\-_]+", alias.lower())
-    body = r"[\s\-_]?".join(re.escape(p) for p in parts)
-    # No letter/digit before; after, forbid more version digits ("sonnet 5.1", "opus 5.55").
-    return rf"(?<![a-z0-9]){body}(?![a-z0-9]|[.\-]\d)"
+    return r"(?<![a-z0-9])" + r"[\s\-_]?".join(re.escape(p) for p in parts)
+
+
+def _alias_pattern(alias: str) -> str:
+    # After the alias, forbid more version digits ("sonnet 5.1", "opus 5.55").
+    return _alias_body(alias) + r"(?![a-z0-9]|[.\-]\d)"
+
+
+def _generic_pattern(alias: str) -> str:
+    # A family name must not be followed by any version: "claude fable 5" is not generic.
+    return _alias_body(alias) + r"(?![a-z0-9]|[\s\-_.]?v?\d)"
 
 
 def load_models():
-    """(Re)build MODELS, MODEL_BY_SLUG and MODEL_PATTERNS from the base list plus models.json."""
-    global MODELS, MODEL_BY_SLUG, MODEL_PATTERNS
-    models = [dict(m, aliases=list(m["aliases"])) for m in BASE_MODELS]
+    """(Re)build MODELS, MODEL_BY_SLUG and the keyword patterns from the base list plus models.json."""
+    global MODELS, MODEL_BY_SLUG, MODEL_PATTERNS, GENERIC
+    models = [dict(m, aliases=list(m["aliases"]), generic=list(m.get("generic", []))) for m in BASE_MODELS]
     by_slug = {m["slug"]: m for m in models}
     try:
         extra = json.loads(EXTRA_MODELS_PATH.read_text())
     except (OSError, ValueError):
         extra = []
     for e in extra:
-        if e["slug"] in by_slug:
-            by_slug[e["slug"]]["aliases"] += [a for a in e.get("aliases", []) if a not in by_slug[e["slug"]]["aliases"]]
+        m = by_slug.get(e["slug"])
+        if m and e.get("replace"):
+            m.update({k: e[k] for k in ("aliases", "generic", "released") if k in e})
+        elif m:
+            m["aliases"] += [a for a in e.get("aliases", []) if a not in m["aliases"]]
         elif e.get("name"):
-            m = dict(e)
+            m = dict(e, generic=list(e.get("generic", [])))
             models.append(m)
             by_slug[m["slug"]] = m
     for m in models:
         m["color"] = LABS.get(m["lab"], "#55555c")
+        m.setdefault("released", "2000-01-01")
     MODELS, MODEL_BY_SLUG = models, by_slug
     MODEL_PATTERNS = {m["slug"]: re.compile("|".join(_alias_pattern(a) for a in m["aliases"]), re.I)
-                      for m in models}
+                      for m in models if m["aliases"]}
+    # Family name -> (pattern, [(released, slug)] newest first).
+    families: dict[str, list] = {}
+    for m in models:
+        for g in m["generic"]:
+            families.setdefault(g.lower(), []).append((m["released"], m["slug"]))
+    GENERIC = [(re.compile(_generic_pattern(g), re.I), sorted(v, reverse=True)) for g, v in families.items()]
 
 
 load_models()
 
 
-def match_models(text: str) -> list[str]:
-    return [slug for slug, pat in MODEL_PATTERNS.items() if pat.search(text or "")]
+def match_models(text: str, created_at: str | None = None) -> list[str]:
+    """Tracked models a tweet mentions. Family names ("claude fable") resolve to the newest
+    tracked version released on or before the tweet's date, or to nothing."""
+    text = text or ""
+    found = {slug for slug, pat in MODEL_PATTERNS.items() if pat.search(text)}
+    day = (created_at or "9999")[:10]
+    for pat, versions in GENERIC:
+        if pat.search(text):
+            slug = next((s for released, s in versions if released <= day), None)
+            if slug:
+                found.add(slug)
+    return sorted(found)

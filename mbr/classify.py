@@ -39,7 +39,7 @@ How much the reported behaviour changes how someone perceives LLMs. Score high f
 
 ## Models tracked
 {models}
-Keyword matching suggested: {candidates}. Return in `models` only slugs the tweet really talks about (it may be a false keyword match, e.g. "sol pro" meaning something else). Return [] if none.
+Keyword matching suggested: {candidates}. Return in `models` only those of these slugs that THE TWEET itself is about, and only for that exact version: other versions of a family are different models (Opus 5 is not Opus 5.5, Fable 5 is not Fable 5.1, GPT-5.6 Sol is not GPT-6 Sol, Muse Spark 1.2 is not 1.3). Models mentioned only in the replies or the quoted tweet don't count, and neither do false keyword matches ("sol pro" meaning something else). Return [] if none remain.
 
 ## The tweet, with its context
 {context}
@@ -113,7 +113,8 @@ def classify(con, limit: int | None = None, workers: int = 12):
                 con.execute("UPDATE reports SET is_report=0, kind='other', score=0 WHERE tweet_id=?",
                             (r["tweet_id"],))
                 continue
-            models = [m for m in g["models"] if m in config.MODEL_BY_SLUG]
+            candidates = json.loads(r["candidates"] or "[]")
+            models = [m for m in g["models"] if m in candidates]
             con.execute(
                 "UPDATE reports SET models=?, kind=?, is_report=?, score=?, behavior=?, classified_at=? "
                 "WHERE tweet_id=?",

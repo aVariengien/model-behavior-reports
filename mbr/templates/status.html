@@ -2,9 +2,57 @@
 
 {% block title %}Status · Model Behavior Reports{% endblock %}
 
+{% block script %}
+<script>
+(function () {
+  var table = document.getElementById("kw"), msg = document.getElementById("kw-msg");
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]; }); }
+  function split(v) { return v.split(",").map(function (x) { return x.trim(); }).filter(Boolean); }
+  function load() {
+    fetch("/status/api/models", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (d) {
+      msg.textContent = d.rekey_running ? "A re-key is running: changes will show up on the site when it finishes." : "";
+      var rows = ['<tr><th>Model</th><th>Released</th><th>Versioned keywords</th><th>Family names</th><th></th></tr>'];
+      d.models.forEach(function (m) {
+        rows.push('<tr data-slug="' + esc(m.slug) + '"><td><b>' + esc(m.name) + '</b><br><span class="muted">' + esc(m.slug) + '</span></td>' +
+          '<td><input name="released" value="' + esc(m.released) + '"></td>' +
+          '<td><textarea name="aliases">' + esc(m.aliases.join(", ")) + '</textarea></td>' +
+          '<td><textarea name="generic">' + esc((m.generic || []).join(", ")) + '</textarea></td>' +
+          '<td><button class="save" disabled>Save</button></td></tr>');
+      });
+      table.innerHTML = rows.join("");
+    }).catch(function () { table.innerHTML = '<tr><td class="muted">Keyword editor unavailable.</td></tr>'; });
+  }
+  table.addEventListener("input", function (e) {
+    var tr = e.target.closest("tr"); tr.classList.add("dirty"); tr.querySelector(".save").disabled = false;
+  });
+  table.addEventListener("click", function (e) {
+    if (!e.target.classList.contains("save")) return;
+    var tr = e.target.closest("tr"), btn = e.target;
+    btn.disabled = true; btn.textContent = "Saving…";
+    fetch("/status/api/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      slug: tr.dataset.slug, released: tr.querySelector("[name=released]").value.trim(),
+      aliases: split(tr.querySelector("[name=aliases]").value), generic: split(tr.querySelector("[name=generic]").value)
+    }) }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.error) { btn.disabled = false; btn.textContent = "Save"; msg.textContent = "Not saved: " + d.error; return; }
+      tr.classList.remove("dirty"); btn.textContent = "Saved";
+      msg.textContent = "Saved " + d.model.slug + ". Re-key " + d.rekey + ".";
+    }).catch(function () { btn.disabled = false; btn.textContent = "Save"; msg.textContent = "Not saved: network error."; });
+  });
+  load();
+})();
+</script>
+{% endblock %}
+
 {% block meta %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 
 {% block style %}
+#kw td { vertical-align: top; white-space: normal; }
+#kw textarea, #kw input { width: 100%; font: 13px var(--mono); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: var(--bg); color: var(--text); resize: vertical; }
+#kw input { width: 118px; }
+#kw textarea { min-width: 220px; min-height: 52px; }
+#kw .save { font: 500 12.5px var(--sans); border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+#kw .save:disabled { opacity: .5; cursor: default; }
+#kw tr.dirty td { background: #fffbea; }
 .st { padding: 32px 0 20px; }
 .st h1 { font: var(--title-w) 40px/1.1 var(--display); margin: 0 0 6px; }
 .st .sub { color: var(--muted); font-size: 14px; margin: 0 0 28px; }
@@ -67,6 +115,19 @@ tr:last-child td { border-bottom: 0; }
       <td class="muted">{% for k, v in r.counters.items() %}{{ k }} {{ v }}{{ ' · ' if not loop.last }}{% endfor %}
         {% if r.error %}<div class="err">{{ r.error }}</div>{% endif %}</td></tr>
     {% else %}<tr><td colspan="6" class="muted">No runs logged yet.</td></tr>{% endfor %}
+  </table></div>
+
+  <h2>Keywords</h2>
+  <p class="muted" style="font-size:13.5px;max-width:760px">
+    <b>Versioned</b> keywords always count. <b>Family names</b> (no version) count only for tweets posted on or after
+    <b>released</b>, and never when followed by another version number ("claude fable 5"). Separate keywords with commas;
+    spaces, hyphens and underscores are interchangeable. Saving re-matches existing reports, rescans the archive,
+    grades new matches and rebuilds the site in the background (about 20 minutes).
+  </p>
+  <div id="kw-msg" class="muted" style="font-size:13.5px;margin-bottom:10px"></div>
+  <div class="scroll"><table id="kw">
+    <tr><th>Model</th><th>Released</th><th>Versioned keywords</th><th>Family names</th><th></th></tr>
+    <tr><td colspan="5" class="muted">Loading…</td></tr>
   </table></div>
 
   <h2>Summaries</h2>

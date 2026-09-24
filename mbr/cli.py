@@ -22,14 +22,22 @@ def main():
     sub.add_parser("quotes", help="refresh quote counts")
     sub.add_parser("videos", help="look up playable video URLs")
     sub.add_parser("stats")
+    sub.add_parser("serve-editor", help="keyword-editing API for /status/ (127.0.0.1:3004)")
     sub.add_parser("check-models", help="look for new models on OpenRouter now")
+    sub.add_parser("rematch", help="re-run keyword matching on stored reports")
+    r = sub.add_parser("rekey", help="after keyword edits: rematch, rescan, grade, rebuild")
+    r.add_argument("--days", type=int, default=config.WINDOW_DAYS)
     args = p.parse_args()
+    if args.cmd == "serve-editor":
+        from . import editor
+        return editor.serve()
 
     # One run at a time: the hourly timer must not overlap a long backfill.
     con = db.connect()
     lock = open(config.DB_PATH.parent / ".lock", "w")
     try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        # A re-key after a keyword edit waits for the hourly run instead of giving up.
+        fcntl.flock(lock, fcntl.LOCK_EX | (0 if args.cmd == "rekey" else fcntl.LOCK_NB))
     except BlockingIOError:
         if args.cmd not in ("build", "stats"):  # read-only commands may run alongside
             sys.exit("another mbr run is in progress")
@@ -66,6 +74,16 @@ def main():
         elif args.cmd == "quotes":
             collect.refresh_quotes(con)
         elif args.cmd == "build":
+            build.build(con)
+        elif args.cmd == "rematch":
+            collect.rematch(con)
+        elif args.cmd == "rekey":
+            collect.rematch(con)
+            collect.rescan(con, args.days)
+            collect.hydrate(con)
+            xmedia.attach_videos(con)
+            classify.classify(con)
+            collect.refresh_quotes(con)
             build.build(con)
         elif args.cmd == "check-models":
             if newmodels.check(con, force=True):

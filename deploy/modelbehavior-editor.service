@@ -1,0 +1,15 @@
+[Unit]
+Description=modelbehavior.report keyword editor API (behind /status/ basic auth)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/modelbehavior
+Environment=MBR_ROOT=/opt/modelbehavior
+Environment=MBR_OUT=/var/www/modelbehavior
+ExecStart=/opt/modelbehavior/.venv/bin/mbr serve-editor
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

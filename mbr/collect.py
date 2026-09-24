@@ -38,7 +38,7 @@ def ingest(con, rows: list[dict]) -> int:
     for r in rows:
         if r["created_at"] < cutoff:
             continue
-        models = config.match_models(r["full_text"])
+        models = config.match_models(r["full_text"], r["created_at"])
         if not models:
             continue
         if r["full_text"].startswith("RT @"):
@@ -158,3 +158,31 @@ def refresh_quotes(con, days: int = 30):
     con.commit()
     print(f"quotes: refreshed {len(rows)} reports, {sum(1 for r in rows if quoters.get(r['tweet_id']))} quoted")
 
+
+
+def rematch(con):
+    """Re-run keyword matching on every stored report (after keyword or version rules change).
+    Reports whose models changed are graded again; ones matching nothing are set aside
+    (hidden, untagged) so a later rescan can revive them if keywords are widened."""
+    changed = dropped = trimmed = 0
+    for r in con.execute("SELECT r.tweet_id, r.candidates, r.models, t.full_text, t.created_at "
+                         "FROM reports r JOIN tweets t USING(tweet_id)").fetchall():
+        models = config.match_models(r["full_text"], r["created_at"])
+        if models != sorted(json.loads(r["candidates"] or "[]")):
+            if not models:
+                con.execute("UPDATE reports SET candidates='[]', models='[]', is_report=0 WHERE tweet_id=?",
+                            (r["tweet_id"],))
+                dropped += 1
+            else:
+                con.execute("UPDATE reports SET candidates=?, is_report=NULL WHERE tweet_id=?",
+                            (json.dumps(models), r["tweet_id"]))
+                changed += 1
+        elif r["models"]:
+            # The grader may only confirm models the tweet itself mentions.
+            kept = [m for m in json.loads(r["models"]) if m in models]
+            if kept != json.loads(r["models"]):
+                con.execute("UPDATE reports SET models=?, is_report=CASE WHEN ?='[]' THEN 0 ELSE is_report END "
+                            "WHERE tweet_id=?", (json.dumps(kept), json.dumps(kept), r["tweet_id"]))
+                trimmed += 1
+    con.commit()
+    print(f"rematch: {changed} to regrade, {dropped} set aside, {trimmed} had models outside their keywords")

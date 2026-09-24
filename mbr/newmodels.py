@@ -16,27 +16,28 @@ SCHEMA = {
     "type": "object", "additionalProperties": False, "required": ["decisions"],
     "properties": {"decisions": {"type": "array", "items": {
         "type": "object", "additionalProperties": False,
-        "required": ["openrouter_ids", "action", "slug", "name", "aliases", "reason"],
+        "required": ["openrouter_ids", "action", "slug", "name", "aliases", "generic", "reason"],
         "properties": {
             "openrouter_ids": {"type": "array", "items": {"type": "string"}},
             "action": {"type": "string", "enum": ["track", "merge", "skip"]},
             "slug": {"type": "string"},
             "name": {"type": "string"},
             "aliases": {"type": "array", "items": {"type": "string"}},
+            "generic": {"type": "array", "items": {"type": "string"}},
             "reason": {"type": "string"},
         }}}},
 }
 
 PROMPT = """We run a site collecting what people on X say about how LLMs behave. We track the current, popular chat/agent models of major labs. New models just appeared on OpenRouter; decide what to do with each.
 
-## Currently tracked (slug: name; keywords)
+## Currently tracked (slug: name; versioned keywords; family names)
 {tracked}
 
 ## New on OpenRouter
 {new}
 
 For each new model (group ids that are the same model, e.g. a model and its "-pro" variant), return one decision:
-- "track": only a new version number of a tracked family's top model (e.g. Opus 5.5 -> Opus 5.6, GPT-6 -> GPT-6.5 Sol), or a new flagship line from a lab. Be conservative: we want about 15 models in total. Give a `slug` (lowercase, hyphens), a display `name` without the lab prefix (e.g. "GPT-6 Terra", "Claude Opus 5.6"), and `aliases`: 3-6 lowercase ways people write it in tweets ("opus 5.6", "claude opus 5.6", "opus-5.6"). Every alias must contain the family name (e.g. "deepseek", "opus", "gpt") plus the version; never a bare version or tier ("v4.1 flash", "sol", "flash", "pro").
+- "track": only a new version number of a tracked family's top model (e.g. Opus 5.5 -> Opus 5.6, GPT-6 -> GPT-6.5 Sol), or a new flagship line from a lab. Be conservative: we want about 15 models in total. Give a `slug` (lowercase, hyphens), a display `name` without the lab prefix (e.g. "GPT-6 Terra", "Claude Opus 5.6"), and `aliases`: 3-6 lowercase ways people write it in tweets ("opus 5.6", "claude opus 5.6", "opus-5.6"), and `generic`: the family names without a version that should now mean this model (copy the predecessor's, e.g. "claude opus"; [] if none). Every alias must contain the family name (e.g. "deepseek", "opus", "gpt") plus the version; never a bare version or tier ("v4.1 flash", "sol", "flash", "pro").
 - "merge": a variant of a model already tracked (Pro/Max/Thinking/Prime/dated snapshot, or a speed/size tier such as Flash, Mini, Lite, Turbo, Omni of a tracked family). Set `slug` to the tracked slug and `aliases` to any new ways to refer to it (may be empty).
 - "skip": speed/size tiers of families we don't track, embeddings, moderation/guard models, image/audio/video-only models, tiny or niche fine-tunes, "-latest" aliases, and older versions superseded by a tracked model.
 Keep `reason` to a few words."""
@@ -62,9 +63,11 @@ def check(con, force=False) -> list[str]:
         print(f"models: {'recorded' if first_run else 'no new'} OpenRouter models ({len(watched)} watched)")
         return []
 
-    tracked = "\n".join(f"- {m['slug']}: {m['name']}; {', '.join(m['aliases'])}" for m in config.MODELS)
+    tracked = "\n".join(f"- {m['slug']}: {m['name']}; {', '.join(m['aliases'])}; {', '.join(m['generic']) or '-'}"
+                        for m in config.MODELS)
     listing = "\n".join(f"- {m['id']} | {m['name']} | released {datetime.fromtimestamp(m['created'], timezone.utc):%Y-%m-%d} | "
                         f"{(m.get('description') or '')[:300]}" for m in new)
+    created = {m["id"]: m["created"] for m in new}
     out = llm.chat_json(config.CLASSIFY_MODEL, PROMPT.format(tracked=tracked, new=listing), SCHEMA,
                         "new_models", max_tokens=16000, purpose="model check")
 
@@ -81,7 +84,10 @@ def check(con, force=False) -> list[str]:
             added.append(d["slug"])
         elif d["action"] == "track" and d["slug"] and aliases and d["slug"] not in config.MODEL_BY_SLUG:
             lab = LABS[d["openrouter_ids"][0].split("/")[0]]
+            released = min(created.get(i, _now().timestamp()) for i in d["openrouter_ids"])
             extra.append({"slug": d["slug"], "name": d["name"], "lab": lab, "aliases": aliases,
+                          "generic": sorted({g.strip().lower() for g in d["generic"] if len(g.strip()) >= 5}),
+                          "released": datetime.fromtimestamp(released, timezone.utc).date().isoformat(),
                           "openrouter_ids": d["openrouter_ids"], "added_at": _now().date().isoformat()})
             added.append(d["slug"])
     runlog.add("models added", len(set(added)))
