@@ -211,7 +211,6 @@ def build(con, out_dir: Path = config.OUT_DIR):
     (tmp / "about").mkdir()
     (tmp / "about" / "index.html").write_text(env.get_template("about.html").render(**common))
     shutil.copy(TEMPLATES / "favicon.svg", tmp / "favicon.svg")
-    shutil.copytree(TEMPLATES / "fonts", tmp / "fonts")
     export.write(tmp, models, items_by_slug, common["built_at"])
 
     # Swap the new build in place.

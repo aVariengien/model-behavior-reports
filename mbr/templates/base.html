@@ -15,44 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://pbs.twimg.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
-<script>
-// Title-font preview: ?font=poppins | neuton | cmu-slanted | cmu-italic | newsreader (kept while browsing this tab).
-(function () {
-  var G = "https://fonts.googleapis.com/css2?display=swap&family=";
-  var CM = "/fonts/";
-  var fonts = {
-    poppins: { css: G + "Poppins:ital,wght@0,300;0,400;1,300;1,400", family: "\"Poppins\", system-ui, sans-serif",
-               titleW: 400, textW: 300 },
-    neuton: { css: G + "Neuton:ital,wght@0,400;0,700;1,400", family: "\"Neuton\", Georgia, serif" },
-    "cmu-slanted": { face: "@font-face{font-family:'CMU Slanted';src:url('" + CM + "cmunsl.woff') format('woff')}" +
-                           "@font-face{font-family:'CMU Slanted';font-weight:bold;src:url('" + CM + "cmunbl.woff') format('woff')}",
-                     family: "\"CMU Slanted\", Georgia, serif" },
-    "cmu-italic": { face: "@font-face{font-family:'CMU Italic';src:url('" + CM + "cmunti.woff') format('woff')}",
-                    family: "\"CMU Italic\", Georgia, serif" }
-  };
-  var m = location.search.match(/[?&]font=([\w-]+)/), key;
-  try {
-    if (m) sessionStorage.setItem("mbr-font", m[1]);
-    key = m ? m[1] : sessionStorage.getItem("mbr-font");
-  } catch (e) { key = m && m[1]; }
-  var f = fonts[key];
-  if (!f) return;
-  if (f.css) {
-    var l = document.createElement("link");
-    l.rel = "stylesheet"; l.href = f.css;
-    document.head.appendChild(l);
-  } else {
-    var st = document.createElement("style");
-    st.textContent = f.face;
-    document.head.appendChild(st);
-  }
-  var root = document.documentElement.style;
-  root.setProperty("--serif", f.family);
-  if (f.titleW) root.setProperty("--title-w", f.titleW);
-  if (f.textW) root.setProperty("--text-w", f.textW);
-})();
-</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Poppins:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
 {% if umami_id %}<script defer src="{{ umami_script }}" data-website-id="{{ umami_id }}"></script>{% endif %}
 <style>
 :root {
@@ -66,9 +29,9 @@
   --muted: #86868d;
   --link: #1f5fcc;
   --live: #1fa855;
-  --serif: "Newsreader", Georgia, serif;
-  --title-w: 500;
-  --text-w: 400;
+  --display: "Poppins", system-ui, sans-serif;
+  --title-w: 400;
+  --text-w: 300;
   --sans: "Inter", system-ui, -apple-system, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, monospace;
 }
@@ -84,8 +47,8 @@ img { display: block; }
 .topnav { position: absolute; top: 22px; right: 24px; display: flex; gap: 18px; font-size: 14px; }
 .topnav a { color: var(--text-2); }
 .topnav a:hover { color: var(--text); }
-.brand { font: var(--title-w) clamp(40px, 6vw, 64px)/1.02 var(--serif); letter-spacing: -0.02em; margin: 0; }
-.dek { font: var(--text-w) clamp(18px, 2.2vw, 22px)/1.4 var(--serif); color: var(--text-2); margin: 14px 0 0; max-width: 40em; }
+.brand { font: var(--title-w) clamp(40px, 6vw, 64px)/1.02 var(--display); letter-spacing: -0.02em; margin: 0; }
+.dek { font: var(--text-w) clamp(18px, 2.2vw, 22px)/1.4 var(--display); color: var(--text-2); margin: 14px 0 0; max-width: 40em; }
 .dek a { color: var(--text); border-bottom: 1px solid var(--line); }
 .dek a:hover { border-color: var(--text-2); }
 .meta { font-size: 14px; color: var(--muted); margin: 16px 0 0; }
@@ -96,7 +59,7 @@ img { display: block; }
 
 /* Sections */
 section { padding: 40px 0; border-bottom: 1px solid var(--line); }
-h2 { font: var(--title-w) clamp(28px, 3.4vw, 36px)/1.15 var(--serif); letter-spacing: -0.015em; margin: 0 0 22px; display: flex; align-items: baseline; gap: 12px; }
+h2 { font: var(--title-w) clamp(28px, 3.4vw, 36px)/1.15 var(--display); letter-spacing: -0.015em; margin: 0 0 22px; display: flex; align-items: baseline; gap: 12px; }
 h2 small { font: 12px var(--mono); color: var(--muted); letter-spacing: 0; }
 .btn { font: 500 13px var(--sans); color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; cursor: pointer; }
 .btn:hover { border-color: var(--muted); }
@@ -143,7 +106,7 @@ h2 small { font: 12px var(--mono); color: var(--muted); letter-spacing: 0; }
 .chip { font: 500 11.5px/1 var(--mono); padding: 4px 8px 4px 7px; border-radius: 6px; color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
 a.chip:hover { background: color-mix(in srgb, var(--c) 22%, transparent); }
-.gist { font-style: italic; font-family: var(--serif); font-size: 14.5px; color: var(--text-2); }
+.gist { font-style: italic; font-family: var(--display); font-size: 14.5px; color: var(--text-2); }
 .xlink { margin-left: auto; color: var(--muted); white-space: nowrap; }
 .xlink:hover { color: var(--text); }
 .replies { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
