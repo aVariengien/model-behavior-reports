@@ -26,6 +26,7 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 CLASSIFY_MODEL = "google/gemini-3.8-flash"
 SUMMARY_MODEL = "anthropic/claude-opus-5.5"
 CLASSIFY_MODEL_NAME = "Gemini 3.8 Flash"
+CLASSIFY_REASONING = "low"  # A/B test on 50 graded tweets: 49/50 agree, ~half the cost
 SUMMARY_MODEL_NAME = "Claude Opus 5.5"
 
 WINDOW_DAYS = 180          # only keep tweets younger than this

@@ -11,7 +11,8 @@ from . import config, runlog
 _client = httpx.Client(timeout=300)
 
 
-def chat_json(model: str, content, schema: dict, name: str, max_tokens=2000, purpose="other") -> dict:
+def chat_json(model: str, content, schema: dict, name: str, max_tokens=2000, purpose="other",
+              reasoning: str | None = None) -> dict:
     key = os.environ["OPENROUTER_API_KEY"]
     body = {
         "model": model,
@@ -21,6 +22,8 @@ def chat_json(model: str, content, schema: dict, name: str, max_tokens=2000, pur
         "max_tokens": max_tokens,
         "usage": {"include": True},
     }
+    if reasoning:
+        body["reasoning"] = {"effort": reasoning}
     error = None
     for attempt in range(4):
         try:

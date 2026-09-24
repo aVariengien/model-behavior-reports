@@ -83,12 +83,14 @@ def classify_one(report, text: str, images: list[str]) -> dict | None:
     content = [{"type": "text", "text": prompt}]
     content += [{"type": "image_url", "image_url": {"url": f"{u}?name=small"}} for u in images]
     try:
-        return llm.chat_json(config.CLASSIFY_MODEL, content, SCHEMA, "report_grade", purpose="grading")
+        return llm.chat_json(config.CLASSIFY_MODEL, content, SCHEMA, "report_grade", purpose="grading",
+                             reasoning=config.CLASSIFY_REASONING)
     except RuntimeError:
         if not images:
             raise
         # An expired image URL can fail the whole call; retry text-only.
-        return llm.chat_json(config.CLASSIFY_MODEL, content[:1], SCHEMA, "report_grade", purpose="grading")
+        return llm.chat_json(config.CLASSIFY_MODEL, content[:1], SCHEMA, "report_grade", purpose="grading",
+                             reasoning=config.CLASSIFY_REASONING)
 
 
 def classify(con, limit: int | None = None, workers: int = 12):
