@@ -164,6 +164,11 @@ def rematch(con):
     """Re-run keyword matching on every stored report (after keyword or version rules change).
     Reports whose models changed are graded again; ones matching nothing are set aside
     (hidden, untagged) so a later rescan can revive them if keywords are widened."""
+    # Candidates never fetched or graded can't be re-checked (no text yet): drop them, the
+    # rescan that follows a keyword change re-adds the ones that still match.
+    stale = con.execute("DELETE FROM reports WHERE hydrated=0 AND is_report IS NULL").rowcount
+    if stale:
+        print(f"rematch: dropped {stale} unfetched candidates (the rescan re-adds real matches)")
     changed = dropped = trimmed = 0
     for r in con.execute("SELECT r.tweet_id, r.candidates, r.models, t.full_text, t.created_at "
                          "FROM reports r JOIN tweets t USING(tweet_id)").fetchall():
