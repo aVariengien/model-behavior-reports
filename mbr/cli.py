@@ -78,13 +78,20 @@ def main():
         elif args.cmd == "rematch":
             collect.rematch(con)
         elif args.cmd == "rekey":
-            collect.rematch(con)
-            collect.rescan(con, args.days)
-            collect.hydrate(con)
-            xmedia.attach_videos(con)
-            classify.classify(con)
-            collect.refresh_quotes(con)
-            build.build(con)
+            # Edits saved while a re-key runs leave a flag; loop until none is pending.
+            pending = config.DB_PATH.parent / ".rekey_pending"
+            while True:
+                pending.unlink(missing_ok=True)
+                config.load_models()
+                collect.rematch(con)
+                collect.rescan(con, args.days)
+                collect.hydrate(con)
+                xmedia.attach_videos(con)
+                classify.classify(con)
+                collect.refresh_quotes(con)
+                build.build(con)
+                if not pending.exists():
+                    break
         elif args.cmd == "check-models":
             if newmodels.check(con, force=True):
                 collect.rescan(con, 14)

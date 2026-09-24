@@ -21,7 +21,8 @@ def _rekey_running() -> bool:
 
 def _start_rekey() -> str:
     if _rekey_running():
-        return "already running (your edit will be picked up by the next hourly run)"
+        (config.DB_PATH.parent / ".rekey_pending").touch()
+        return "queued (it runs again right after the current one)"
     subprocess.run(["systemctl", "reset-failed", REKEY_UNIT], capture_output=True)
     subprocess.run([
         "systemd-run", f"--unit={REKEY_UNIT}", "--collect",
