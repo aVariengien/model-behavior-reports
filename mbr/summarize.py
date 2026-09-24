@@ -1,6 +1,7 @@
 """Per-model personality summaries, written from the collected reports."""
 
 import json
+import re
 from datetime import datetime, timedelta, timezone
 
 from . import config, llm, runlog
@@ -9,26 +10,50 @@ from .classify import context_for
 SCHEMA = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["one_liner", "aggregate", "portrait"],
+    "required": ["themes", "one_liner", "aggregate", "portrait"],
     "properties": {
+        "themes": {"type": "array", "items": {
+            "type": "object", "additionalProperties": False, "required": ["theme", "reports"],
+            "properties": {"theme": {"type": "string"},
+                           "reports": {"type": "array", "items": {"type": "integer"}}}}},
         "one_liner": {"type": "string"},
         "aggregate": {"type": "string"},
         "portrait": {"type": "string"},
     },
 }
 
-PROMPT = """Below are {n} reports posted on X by people describing how {name} behaves: its tendencies, quirks and personality. Each report comes with the tweet it replies to, the tweet it quotes, and its top replies, when available.
+PROMPT = """Below are {n} reports posted on X by people describing how {name} behaves: its tendencies, quirks and personality. Each report is one tweet, marked [THE TWEET]. The tweet it replies to, the tweet it quotes and its top replies are shown as context: they help you understand the report, but they are NOT separate reports. A reply agreeing with a report does not make a second report.
 
-Write three things, in plain, concrete English, without hype:
+Write, in plain, concrete English, without hype:
 
-1. `one_liner`: the single most important personality trait, in this exact format: a two-to-four word noun phrase, then one sentence explaining it. Example: "A paranoid. It tends to walk on tiptoes and suspects every question is an evaluation."
-2. `aggregate`: two short sentences, 45 words at most in total, shown on a small card. Name only the 2-3 biggest themes, with counts. Example: "4 reports of pushing back when the user is wrong, 3 of taking actions it wasn't allowed to. Several people also find it unusually funny." Count only reports you can see below; never invent numbers. Do not list examples in parentheses.
-3. `portrait`: five or six free-form sentences giving a fuller portrait of the model's character as reported: its recurring tendencies, what surprises people, where reports disagree.
+1. `themes`: first, the recurring behaviours, each with the numbers of the reports that show it (e.g. {{"theme": "pushes back when the user is wrong", "reports": [2, 7, 11]}}). Only cite a report for a theme if its tweet itself describes that behaviour. A theme may have a single report.
+2. `one_liner`: the single most important personality trait, in this exact format: a two-to-four word noun phrase, then one sentence explaining it. Example: "A paranoid. It tends to walk on tiptoes and suspects every question is an evaluation."
+3. `aggregate`: two short sentences, 45 words at most in total, shown on a small card, about the 2-3 biggest themes. Every count you write must equal the number of reports you listed for that theme; never count replies, quoted tweets or context. With {n} reports in total, no count can exceed {n}. When a theme rests on one report, say "one report" rather than implying a trend. Example: "4 reports of pushing back when the user is wrong, 3 of taking actions it wasn't allowed to. One report also finds it unusually funny." Do not list examples in parentheses.
+4. `portrait`: five or six free-form sentences giving a fuller portrait of the model's character as reported: its recurring tendencies, what surprises people, where reports disagree. Be honest about thin evidence: if most themes rest on one or two reports, say so.
 
 Weigh a report more when it is vivid, specific, or widely discussed (quotes by community accounts are the best signal; likes and retweets are also given). Ignore reports that are really about capabilities or are unclear.
 
 ## Reports
 {reports}"""
+
+WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+
+
+def _problems(out: dict, n: int) -> list[str]:
+    """Counts that can't be right: more reports than exist, or cited reports that don't exist."""
+    issues = []
+    cited = {i for t in out["themes"] for i in t["reports"]}
+    if any(i < 1 or i > n for i in cited):
+        issues.append(f"themes cite report numbers outside 1..{n}")
+    sizes = {len(set(t["reports"])) for t in out["themes"]}
+    for num, _ in re.findall(r"\b(\d+|" + "|".join(WORDS) + r")\s+(?:\w+\s+){0,2}(reports?|posts?|users|people)\b",
+                             out["aggregate"], re.I):
+        k = int(num) if num.isdigit() else WORDS[num.lower()]
+        if k > n:
+            issues.append(f"aggregate says {k} reports but there are only {n}")
+        elif k not in sizes and k > 1:
+            issues.append(f"aggregate says {k} reports, but no theme lists {k} reports")
+    return issues
 
 
 def _reports_for(con, slug):
@@ -54,7 +79,9 @@ def summarize(con, force=False):
         old = con.execute("SELECT * FROM model_summaries WHERE slug=?", (m["slug"],)).fetchone()
         if old and not force:
             fresh = now - datetime.fromisoformat(old["updated_at"]) < timedelta(hours=config.SUMMARY_EVERY_HOURS)
-            if fresh or n - old["n_reports"] < config.SUMMARY_MIN_NEW:
+            # Reports removed (e.g. keyword changes): the summary may cite them, rewrite now.
+            shrunk = n < old["n_reports"]
+            if not shrunk and (fresh or n - old["n_reports"] < config.SUMMARY_MIN_NEW):
                 continue
         rows = _reports_for(con, m["slug"])
         blocks = []
@@ -63,8 +90,14 @@ def summarize(con, force=False):
             blocks.append(f"### Report {i} ({r['created_at'][:10]}, {r['quotes']} quotes by community accounts, {r['likes']} likes, {r['retweets']} retweets)"
                           f"\nGist: {r['behavior']}\n{text}")
         print(f"summarizing {m['name']} from {len(rows)} reports with {config.SUMMARY_MODEL}", flush=True)
-        out = llm.chat_json(config.SUMMARY_MODEL, PROMPT.format(
-            n=len(rows), name=m["name"], reports="\n".join(blocks)), SCHEMA, "model_summary", max_tokens=4000, purpose="summaries")
+        prompt = PROMPT.format(n=len(rows), name=m["name"], reports="\n".join(blocks))
+        out = llm.chat_json(config.SUMMARY_MODEL, prompt, SCHEMA, "model_summary", max_tokens=6000, purpose="summaries")
+        issues = _problems(out, len(rows))
+        if issues:
+            print(f"  counts look wrong ({'; '.join(issues)}), rewriting once", flush=True)
+            out = llm.chat_json(config.SUMMARY_MODEL, prompt + "\n\n## Correction\nA previous draft had these errors: "
+                                + "; ".join(issues) + ". Recount from the report numbers.",
+                                SCHEMA, "model_summary", max_tokens=6000, purpose="summaries")
         con.execute("INSERT OR REPLACE INTO model_summaries VALUES (?,?,?,?,?,?)",
                     (m["slug"], out["one_liner"].strip(), out["aggregate"].strip(), out["portrait"].strip(),
                      n, now.isoformat(timespec="seconds")))
