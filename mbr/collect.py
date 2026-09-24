@@ -3,7 +3,7 @@
 import json
 from datetime import datetime, timedelta, timezone
 
-from . import archive, config, db
+from . import archive, config, db, runlog
 
 SCAN_SELECT = ("tweet_id,created_at,updated_at,full_text,favorite_count,retweet_count,"
                "reply_to_tweet_id")
@@ -54,6 +54,7 @@ def ingest(con, rows: list[dict]) -> int:
                 con.execute("UPDATE tweets SET retweets=MAX(retweets,?) WHERE tweet_id=?",
                             (retweets[rt_id][1]["retweet_count"] or 0, orig_id))
 
+    runlog.add("scanned", len(rows))
     new = 0
     for tid, models in found.items():
         old = con.execute("SELECT candidates FROM reports WHERE tweet_id=?", (tid,)).fetchone()
@@ -68,6 +69,7 @@ def ingest(con, rows: list[dict]) -> int:
                         (tid, json.dumps(sorted(models))))
             new += 1
     con.commit()
+    runlog.add("candidates", new)
     return new
 
 
@@ -136,6 +138,7 @@ def hydrate(con, batch: int = 200):
             con.execute("UPDATE reports SET hydrated=1, reply_ids=?, created_at=? WHERE tweet_id=?",
                         (json.dumps(reply_ids), t["created_at"] if t else None, tid))
         con.commit()
+        runlog.add("hydrated", len(ids))
         print(f"  hydrated {len(ids)} reports", flush=True)
 
 

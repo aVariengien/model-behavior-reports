@@ -49,6 +49,15 @@ CREATE TABLE IF NOT EXISTS model_summaries (
 );
 
 CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT);
+
+CREATE TABLE IF NOT EXISTS runs (
+    started_at TEXT, command TEXT, seconds INTEGER, status TEXT, error TEXT,
+    counters TEXT, cost REAL
+);
+CREATE TABLE IF NOT EXISTS llm_calls (
+    ts TEXT, purpose TEXT, model TEXT, prompt_tokens INTEGER, completion_tokens INTEGER, cost REAL
+);
+CREATE INDEX IF NOT EXISTS llm_calls_ts ON llm_calls(ts);
 """
 
 

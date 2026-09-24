@@ -10,7 +10,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 from markupsafe import Markup, escape
 
-from . import config, export
+from . import config, export, status
 
 TEMPLATES = Path(__file__).parent / "templates"
 NOTABLE_N = 50
@@ -206,6 +206,8 @@ def build(con, out_dir: Path = config.OUT_DIR):
         page.mkdir(parents=True)
         (page / "index.html").write_text(env.get_template("model.html").render(
             **common, model=m, items=items, models=models))
+    (tmp / "status").mkdir()
+    (tmp / "status" / "index.html").write_text(env.get_template("status.html").render(**common, s=status.collect(con)))
     (tmp / "about").mkdir()
     (tmp / "about" / "index.html").write_text(env.get_template("about.html").render(**common))
     shutil.copy(TEMPLATES / "favicon.svg", tmp / "favicon.svg")

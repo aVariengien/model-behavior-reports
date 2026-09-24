@@ -3,7 +3,7 @@
 import json
 from datetime import datetime, timedelta, timezone
 
-from . import config, llm
+from . import config, llm, runlog
 from .classify import context_for
 
 SCHEMA = {
@@ -64,8 +64,9 @@ def summarize(con, force=False):
                           f"\nGist: {r['behavior']}\n{text}")
         print(f"summarizing {m['name']} from {len(rows)} reports with {config.SUMMARY_MODEL}", flush=True)
         out = llm.chat_json(config.SUMMARY_MODEL, PROMPT.format(
-            n=len(rows), name=m["name"], reports="\n".join(blocks)), SCHEMA, "model_summary", max_tokens=4000)
+            n=len(rows), name=m["name"], reports="\n".join(blocks)), SCHEMA, "model_summary", max_tokens=4000, purpose="summaries")
         con.execute("INSERT OR REPLACE INTO model_summaries VALUES (?,?,?,?,?,?)",
                     (m["slug"], out["one_liner"].strip(), out["aggregate"].strip(), out["portrait"].strip(),
                      n, now.isoformat(timespec="seconds")))
         con.commit()
+        runlog.add("summaries")

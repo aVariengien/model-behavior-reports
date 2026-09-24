@@ -6,12 +6,12 @@ import time
 
 import httpx
 
-from . import config
+from . import config, runlog
 
 _client = httpx.Client(timeout=300)
 
 
-def chat_json(model: str, content, schema: dict, name: str, max_tokens=2000) -> dict:
+def chat_json(model: str, content, schema: dict, name: str, max_tokens=2000, purpose="other") -> dict:
     key = os.environ["OPENROUTER_API_KEY"]
     body = {
         "model": model,
@@ -19,6 +19,7 @@ def chat_json(model: str, content, schema: dict, name: str, max_tokens=2000) -> 
         "response_format": {"type": "json_schema",
                             "json_schema": {"name": name, "strict": True, "schema": schema}},
         "max_tokens": max_tokens,
+        "usage": {"include": True},
     }
     error = None
     for attempt in range(4):
@@ -28,6 +29,8 @@ def chat_json(model: str, content, schema: dict, name: str, max_tokens=2000) -> 
                 "HTTP-Referer": config.SITE_URL, "X-Title": "Model Behavior Reports"})
             if r.status_code == 200:
                 data = r.json()
+                if data.get("usage"):
+                    runlog.llm_call(purpose, model, data["usage"])
                 text = (data.get("choices") or [{}])[0].get("message", {}).get("content")
                 if text:
                     return json.loads(text[text.find("{"):text.rfind("}") + 1])

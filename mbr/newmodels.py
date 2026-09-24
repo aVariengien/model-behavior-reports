@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
-from . import config, db, llm
+from . import config, db, llm, runlog
 
 # OpenRouter id prefix -> our lab key (only these labs are watched).
 LABS = {"anthropic": "anthropic", "openai": "openai", "google": "google", "x-ai": "xai",
@@ -66,7 +66,7 @@ def check(con, force=False) -> list[str]:
     listing = "\n".join(f"- {m['id']} | {m['name']} | released {datetime.fromtimestamp(m['created'], timezone.utc):%Y-%m-%d} | "
                         f"{(m.get('description') or '')[:300]}" for m in new)
     out = llm.chat_json(config.CLASSIFY_MODEL, PROMPT.format(tracked=tracked, new=listing), SCHEMA,
-                        "new_models", max_tokens=16000)
+                        "new_models", max_tokens=16000, purpose="model check")
 
     try:
         extra = json.loads(config.EXTRA_MODELS_PATH.read_text())
@@ -84,6 +84,7 @@ def check(con, force=False) -> list[str]:
             extra.append({"slug": d["slug"], "name": d["name"], "lab": lab, "aliases": aliases,
                           "openrouter_ids": d["openrouter_ids"], "added_at": _now().date().isoformat()})
             added.append(d["slug"])
+    runlog.add("models added", len(set(added)))
     config.EXTRA_MODELS_PATH.write_text(json.dumps(extra, indent=2))
     config.load_models()
     return added

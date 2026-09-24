@@ -4,7 +4,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
-from . import config, llm
+from . import config, llm, runlog
 
 KINDS = ["behavior_report", "tendency", "commentary", "capability", "benchmark",
          "news", "hype", "joke", "other"]
@@ -83,12 +83,12 @@ def classify_one(report, text: str, images: list[str]) -> dict | None:
     content = [{"type": "text", "text": prompt}]
     content += [{"type": "image_url", "image_url": {"url": f"{u}?name=small"}} for u in images]
     try:
-        return llm.chat_json(config.CLASSIFY_MODEL, content, SCHEMA, "report_grade")
+        return llm.chat_json(config.CLASSIFY_MODEL, content, SCHEMA, "report_grade", purpose="grading")
     except RuntimeError:
         if not images:
             raise
         # An expired image URL can fail the whole call; retry text-only.
-        return llm.chat_json(config.CLASSIFY_MODEL, content[:1], SCHEMA, "report_grade")
+        return llm.chat_json(config.CLASSIFY_MODEL, content[:1], SCHEMA, "report_grade", purpose="grading")
 
 
 def classify(con, limit: int | None = None, workers: int = 12):
@@ -121,6 +121,8 @@ def classify(con, limit: int | None = None, workers: int = 12):
                  g["interestingness"], g["behavior"].strip(),
                  datetime.now(timezone.utc).isoformat(timespec="seconds"), r["tweet_id"]))
             done += 1
+            runlog.add("graded")
+            runlog.add("new reports", int(bool(g["is_behavior_report"] and models) and g["interestingness"] >= config.MIN_SCORE))
             if done % 50 == 0:
                 con.commit()
                 print(f"  classified {done}/{len(rows)}", flush=True)

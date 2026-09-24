@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+{% block meta %}{% endblock %}
 <title>{% block title %}Model Behavior Reports{% endblock %}</title>
 <meta name="description" content="{% block description %}Crowdsourced LLM behaviors from X. Built from the Community Archive.{% endblock %}">
 <meta property="og:title" content="{{ self.title() }}">
@@ -16,24 +17,34 @@
 <link rel="preconnect" href="https://pbs.twimg.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
 <script>
-// Title-font preview: ?font=poppins | neuton | newsreader (kept while browsing this tab).
+// Title-font preview: ?font=poppins | neuton | cmu-slanted | cmu-italic | newsreader (kept while browsing this tab).
 (function () {
+  var G = "https://fonts.googleapis.com/css2?display=swap&family=";
+  var CM = "https://cdn.jsdelivr.net/gh/bitmaks/cm-web-fonts@latest/font/";
   var fonts = {
-    poppins: ["Poppins:ital,wght@0,400;0,500;0,600;1,400", "\"Poppins\", system-ui, sans-serif"],
-    neuton: ["Neuton:ital,wght@0,400;0,700;1,400", "\"Neuton\", Georgia, serif"]
+    poppins: { css: G + "Poppins:ital,wght@0,400;0,500;0,600;1,400", family: "\"Poppins\", system-ui, sans-serif" },
+    neuton: { css: G + "Neuton:ital,wght@0,400;0,700;1,400", family: "\"Neuton\", Georgia, serif" },
+    "cmu-slanted": { css: CM + "Serif%20Slanted/cmun-serif-slanted.css", family: "\"Computer Modern Serif Slanted\", Georgia, serif" },
+    "cmu-italic": { face: "@font-face{font-family:'CMU Italic';src:url('" + CM + "Serif/cmunti.woff') format('woff')}",
+                    family: "\"CMU Italic\", Georgia, serif" }
   };
-  var m = location.search.match(/[?&]font=(\w+)/), key;
+  var m = location.search.match(/[?&]font=([\w-]+)/), key;
   try {
     if (m) sessionStorage.setItem("mbr-font", m[1]);
     key = m ? m[1] : sessionStorage.getItem("mbr-font");
   } catch (e) { key = m && m[1]; }
   var f = fonts[key];
   if (!f) return;
-  var l = document.createElement("link");
-  l.rel = "stylesheet";
-  l.href = "https://fonts.googleapis.com/css2?family=" + f[0] + "&display=swap";
-  document.head.appendChild(l);
-  document.documentElement.style.setProperty("--serif", f[1]);
+  if (f.css) {
+    var l = document.createElement("link");
+    l.rel = "stylesheet"; l.href = f.css;
+    document.head.appendChild(l);
+  } else {
+    var st = document.createElement("style");
+    st.textContent = f.face;
+    document.head.appendChild(st);
+  }
+  document.documentElement.style.setProperty("--serif", f.family);
 })();
 </script>
 {% if umami_id %}<script defer src="{{ umami_script }}" data-website-id="{{ umami_id }}"></script>{% endif %}
