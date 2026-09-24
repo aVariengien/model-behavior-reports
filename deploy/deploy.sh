@@ -2,7 +2,7 @@
 # Push code to mimosa and refresh the venv and systemd units.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-rsync -az --delete --exclude .venv --exclude data --exclude dist --exclude secrets.env \
+rsync -az --delete --exclude .git --exclude .venv --exclude data --exclude dist --exclude secrets.env \
   --exclude __pycache__ ./ mimosa:/opt/modelbehavior/
 ssh mimosa 'set -e
   cd /opt/modelbehavior && uv sync -q
