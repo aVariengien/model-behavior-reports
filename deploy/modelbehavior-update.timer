@@ -1,0 +1,10 @@
+[Unit]
+Description=Rebuild modelbehavior.report every hour
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=2m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

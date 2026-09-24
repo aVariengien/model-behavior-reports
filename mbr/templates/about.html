@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}About · Model Behavior Reports{% endblock %}
+
+{% block style %}
+.crumbs { padding-top: 24px; }
+.crumbs a { font: 500 17px var(--serif); color: var(--text-2); }
+.crumbs a:hover { color: var(--text); }
+.about { max-width: 680px; padding: 40px 0 20px; }
+.about h1 { font: 500 clamp(34px, 5vw, 52px)/1.05 var(--serif); letter-spacing: -0.02em; margin: 0 0 20px; }
+.about h2 { margin: 40px 0 12px; }
+.about p, .about li { font-size: 16px; line-height: 1.65; color: var(--text); }
+.about p.lede { font: 400 clamp(19px, 2.2vw, 22px)/1.45 var(--serif); color: var(--text-2); }
+.about a { color: var(--link); }
+.about code { font: 13.5px var(--mono); background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+.about ol, .about ul { padding-left: 22px; }
+.about li + li { margin-top: 6px; }
+{% endblock %}
+
+{% block body %}
+<nav class="wrap crumbs"><a href="/">← Model Behavior Reports</a></nav>
+<main class="wrap">
+<article class="about">
+  <h1>About</h1>
+  <p class="lede">Benchmarks measure what language models can do. This site collects what people notice about how they <em>behave</em>: their tendencies, quirks and personality, as reported in the wild on X.</p>
+
+  <p>A report can be a precise episode ("it hallucinated a message I never wrote, then solved it") or a general feeling ("it's really good at pushing back when I'm wrong"). What makes one interesting is usually a surprise: the model doing something unprompted, out of place, funny, or revealing about how it sees itself.</p>
+
+  <h2>How it works</h2>
+  <ol>
+    <li>Every hour, new tweets from the <a href="https://www.community-archive.org" target="_blank" rel="noopener">Community Archive</a>, an open, opt-in archive of X, are scanned for mentions of about fifteen current models.</li>
+    <li>Each matching tweet is read together with the tweet it replies to, the tweet it quotes, its top replies and its screenshots. {{ classifier }} decides whether it describes a <em>behavior</em> (not a capability, benchmark or piece of news) and scores how interesting it is from 1 to 10. Reports scoring {{ min_score }} or more appear on the site.</li>
+    <li>Reports are ranked by <code>{{ rank_quote }} × quotes + {{ rank_rt }} × log2(1 + min(retweets, {{ rank_cap }})) + {{ rank_score }} × interestingness</code>, where <em>quotes</em> counts distinct Community Archive accounts that quote-tweeted the report, the best sign of a report people actually discussed.</li>
+    <li>Once a day, {{ summarizer }} reads each model's reports and writes the one-line trait and short portrait shown on its card.</li>
+    <li>New releases on OpenRouter are checked daily and added automatically.</li>
+  </ol>
+
+  <h2>Limitations</h2>
+  <ul>
+    <li>Coverage is limited to accounts in the Community Archive and what its stream captures, so it is a slice of X, not all of it.</li>
+    <li>Models are found by keywords, and reports are graded by a language model; both make mistakes. Add <code>?debug=1</code> to any page to see each tweet's score.</li>
+    <li>Summaries describe what people <em>report</em>, which is shaped by who posts and what goes viral. They are not measurements.</li>
+  </ul>
+
+  <h2>Data</h2>
+  <p>Everything is available as plain text for language models: <a href="/llms.txt">llms.txt</a> (index and summaries), one Markdown file per model under <code>/data/</code>, and <a href="/llms-full.txt">llms-full.txt</a> with every report and its context.</p>
+
+  <h2>Credits</h2>
+  <p>Made by <a href="https://alexandrevariengien.com" target="_blank" rel="noopener">Alexandre Variengien</a>. The code is open source on <a href="{{ github }}" target="_blank" rel="noopener">GitHub</a>. Data from the <a href="https://www.community-archive.org" target="_blank" rel="noopener">Community Archive</a>; thanks to everyone who contributes their archive.</p>
+</article>
+</main>
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "tweet.html" import card %}
+
+{% block title %}{{ model.name }} · Model Behavior Reports{% endblock %}
+{% block description %}{% if model.summary %}{{ model.summary.one_liner }}{% else %}Crowdsourced reports of how {{ model.name }} behaves.{% endif %}{% endblock %}
+
+{% block style %}
+.crumbs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 24px; }
+.crumbs .home { font: 500 17px var(--serif); margin-right: 8px; color: var(--text-2); }
+.crumbs .home:hover { color: var(--text); }
+.crumbs .chip { opacity: .55; }
+.crumbs .chip:hover, .crumbs .chip.on { opacity: 1; }
+.mh { padding-top: 40px; padding-bottom: 34px; border-bottom: 1px solid var(--line); }
+.mh .kicker { font: 12px var(--mono); color: var(--c); letter-spacing: .04em; text-transform: uppercase; }
+.mh h1 { font: 500 clamp(34px, 5vw, 52px)/1.05 var(--serif); letter-spacing: -0.02em; margin: 10px 0 0; }
+.mh .one { font: 400 clamp(20px, 2.4vw, 26px)/1.35 var(--serif); margin: 18px 0 0; max-width: 34em; }
+.mh .one b { font-weight: 500; font-style: italic; }
+.mh .agg { color: var(--text-2); margin: 14px 0 0; max-width: 46em; }
+.mh .portrait { margin: 18px 0 0; max-width: 46em; color: var(--text); font-size: 16px; line-height: 1.65; }
+.mh .when { font: 12px var(--mono); color: var(--muted); margin-top: 16px; }
+.toolbar { max-width: 760px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.toolbar h2 { margin: 0; }
+.sort { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.sort button { font: 500 13px var(--sans); color: var(--muted); background: none; border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+.sort button.on { background: var(--surface-2); color: var(--text); }
+.list { max-width: 760px; }
+{% endblock %}
+
+{% block body %}
+<nav class="wrap crumbs">
+  <a class="home" href="/">Model Behavior Reports</a>
+  {% for m in models %}<a class="chip{{ ' on' if m.slug == model.slug }}" style="--c:{{ m.color }}" href="/model/{{ m.slug }}/">{{ m.name }}</a>{% endfor %}
+</nav>
+<header class="wrap mh" style="--c:{{ model.color }}">
+  <div class="kicker">{{ model.n }} reports</div>
+  <h1>{{ model.name }}</h1>
+  {% if model.summary %}
+    <p class="one"><b>{{ model.one_head }}</b> {{ model.one_rest }}</p>
+    <p class="agg">{{ model.summary.aggregate }}</p>
+    <p class="portrait">{{ model.summary.portrait }}</p>
+    <div class="when">summary written <time datetime="{{ model.summary.updated_at }}" data-long="% ago">{{ model.summary.updated_at[:10] }}</time> from the reports below</div>
+  {% endif %}
+</header>
+<main class="wrap">
+<section>
+  <div class="toolbar">
+    <h2>Reports</h2>
+    <div class="sort" role="group" aria-label="Sort reports">
+      <button data-sort="rank" class="on">Top</button>
+      <button data-sort="time">Newest</button>
+    </div>
+  </div>
+  <div class="list" id="list">
+    {% for t in items %}{{ card(t, tags_top=True) }}{% endfor %}
+  </div>
+  <div class="more-row" style="margin-top:16px"><button class="btn hidden" id="more">Show more</button></div>
+</section>
+</main>
+{% endblock %}
+
+{% block script %}
+<script>
+(function () {
+  var PAGE = 30, shown = PAGE, list = document.getElementById("list"), more = document.getElementById("more");
+  var cards = Array.prototype.slice.call(list.children);
+  function paint() {
+    cards.forEach(function (c, i) { c.classList.toggle("hidden", i >= shown); });
+    more.classList.toggle("hidden", shown >= cards.length);
+  }
+  function sort(key) {
+    cards.sort(function (a, b) {
+      if (key === "time") return a.dataset.time < b.dataset.time ? 1 : -1;
+      return (+b.dataset[key] - +a.dataset[key]) || (+b.dataset.rt - +a.dataset.rt) || (+b.dataset.likes - +a.dataset.likes);
+    });
+    cards.forEach(function (c) { list.appendChild(c); });
+    shown = PAGE; paint();
+  }
+  document.querySelectorAll(".sort button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll(".sort button").forEach(function (x) { x.classList.toggle("on", x === b); });
+      sort(b.dataset.sort);
+    });
+  });
+  more.addEventListener("click", function () { shown += PAGE; paint(); });
+  paint();
+})();
+</script>
+{% endblock %}

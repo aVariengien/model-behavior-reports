@@ -1,0 +1,16 @@
+[Unit]
+Description=modelbehavior.report: scan the Community Archive, grade reports, rebuild the site
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/modelbehavior
+EnvironmentFile=/opt/modelbehavior/secrets.env
+Environment=MBR_ROOT=/opt/modelbehavior
+Environment=MBR_OUT=/var/www/modelbehavior
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/modelbehavior/.venv/bin/mbr update
+TimeoutStartSec=50min
