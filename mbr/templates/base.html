@@ -22,7 +22,8 @@
   var G = "https://fonts.googleapis.com/css2?display=swap&family=";
   var CM = "/fonts/";
   var fonts = {
-    poppins: { css: G + "Poppins:ital,wght@0,400;0,500;0,600;1,400", family: "\"Poppins\", system-ui, sans-serif" },
+    poppins: { css: G + "Poppins:ital,wght@0,300;0,400;1,300;1,400", family: "\"Poppins\", system-ui, sans-serif",
+               titleW: 400, textW: 300 },
     neuton: { css: G + "Neuton:ital,wght@0,400;0,700;1,400", family: "\"Neuton\", Georgia, serif" },
     "cmu-slanted": { face: "@font-face{font-family:'CMU Slanted';src:url('" + CM + "cmunsl.woff') format('woff')}" +
                            "@font-face{font-family:'CMU Slanted';font-weight:bold;src:url('" + CM + "cmunbl.woff') format('woff')}",
@@ -46,7 +47,10 @@
     st.textContent = f.face;
     document.head.appendChild(st);
   }
-  document.documentElement.style.setProperty("--serif", f.family);
+  var root = document.documentElement.style;
+  root.setProperty("--serif", f.family);
+  if (f.titleW) root.setProperty("--title-w", f.titleW);
+  if (f.textW) root.setProperty("--text-w", f.textW);
 })();
 </script>
 {% if umami_id %}<script defer src="{{ umami_script }}" data-website-id="{{ umami_id }}"></script>{% endif %}
@@ -63,6 +67,8 @@
   --link: #1f5fcc;
   --live: #1fa855;
   --serif: "Newsreader", Georgia, serif;
+  --title-w: 500;
+  --text-w: 400;
   --sans: "Inter", system-ui, -apple-system, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, monospace;
 }
@@ -78,8 +84,8 @@ img { display: block; }
 .topnav { position: absolute; top: 22px; right: 24px; display: flex; gap: 18px; font-size: 14px; }
 .topnav a { color: var(--text-2); }
 .topnav a:hover { color: var(--text); }
-.brand { font: 500 clamp(40px, 6vw, 64px)/1.02 var(--serif); letter-spacing: -0.02em; margin: 0; }
-.dek { font: 400 clamp(18px, 2.2vw, 22px)/1.4 var(--serif); color: var(--text-2); margin: 14px 0 0; max-width: 40em; }
+.brand { font: var(--title-w) clamp(40px, 6vw, 64px)/1.02 var(--serif); letter-spacing: -0.02em; margin: 0; }
+.dek { font: var(--text-w) clamp(18px, 2.2vw, 22px)/1.4 var(--serif); color: var(--text-2); margin: 14px 0 0; max-width: 40em; }
 .dek a { color: var(--text); border-bottom: 1px solid var(--line); }
 .dek a:hover { border-color: var(--text-2); }
 .meta { font-size: 14px; color: var(--muted); margin: 16px 0 0; }
@@ -90,7 +96,7 @@ img { display: block; }
 
 /* Sections */
 section { padding: 40px 0; border-bottom: 1px solid var(--line); }
-h2 { font: 500 clamp(28px, 3.4vw, 36px)/1.15 var(--serif); letter-spacing: -0.015em; margin: 0 0 22px; display: flex; align-items: baseline; gap: 12px; }
+h2 { font: var(--title-w) clamp(28px, 3.4vw, 36px)/1.15 var(--serif); letter-spacing: -0.015em; margin: 0 0 22px; display: flex; align-items: baseline; gap: 12px; }
 h2 small { font: 12px var(--mono); color: var(--muted); letter-spacing: 0; }
 .btn { font: 500 13px var(--sans); color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; cursor: pointer; }
 .btn:hover { border-color: var(--muted); }
