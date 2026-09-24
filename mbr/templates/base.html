@@ -20,12 +20,14 @@
 // Title-font preview: ?font=poppins | neuton | cmu-slanted | cmu-italic | newsreader (kept while browsing this tab).
 (function () {
   var G = "https://fonts.googleapis.com/css2?display=swap&family=";
-  var CM = "https://cdn.jsdelivr.net/gh/bitmaks/cm-web-fonts@latest/font/";
+  var CM = "/fonts/";
   var fonts = {
     poppins: { css: G + "Poppins:ital,wght@0,400;0,500;0,600;1,400", family: "\"Poppins\", system-ui, sans-serif" },
     neuton: { css: G + "Neuton:ital,wght@0,400;0,700;1,400", family: "\"Neuton\", Georgia, serif" },
-    "cmu-slanted": { css: CM + "Serif%20Slanted/cmun-serif-slanted.css", family: "\"Computer Modern Serif Slanted\", Georgia, serif" },
-    "cmu-italic": { face: "@font-face{font-family:'CMU Italic';src:url('" + CM + "Serif/cmunti.woff') format('woff')}",
+    "cmu-slanted": { face: "@font-face{font-family:'CMU Slanted';src:url('" + CM + "cmunsl.woff') format('woff')}" +
+                           "@font-face{font-family:'CMU Slanted';font-weight:bold;src:url('" + CM + "cmunbl.woff') format('woff')}",
+                     family: "\"CMU Slanted\", Georgia, serif" },
+    "cmu-italic": { face: "@font-face{font-family:'CMU Italic';src:url('" + CM + "cmunti.woff') format('woff')}",
                     family: "\"CMU Italic\", Georgia, serif" }
   };
   var m = location.search.match(/[?&]font=([\w-]+)/), key;
