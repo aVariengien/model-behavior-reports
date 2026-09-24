@@ -10,8 +10,6 @@
 .notable-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
 .notable-list.masonry { display: flex; align-items: flex-start; }
 .notable-list.masonry > .col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
-.readmore { font: 500 13px var(--sans); color: var(--link); background: none; border: 0; padding: 4px 0 0; cursor: pointer; }
-.tw.expanded .tw-text { -webkit-line-clamp: unset !important; display: block !important; }
 .notable-list .tw { margin: 0; }
 .notable-list .tw-text { -webkit-line-clamp: 8; }
 .notable-list .media { max-width: none; }
@@ -42,6 +40,7 @@
 .mc-top-tweet[open] summary::before { content: "▾"; }
 .mc-top-tweet summary span { overflow: hidden; text-overflow: ellipsis; }
 .mc-top-tweet .tw { margin-top: 10px; }
+.mc-top-tweet .tw-head .handle { display: none; }
 .mc-link { margin-top: auto; padding-top: 14px; font-size: 13px; color: var(--text-2); }
 .mc-link:hover { color: var(--text); }
 
@@ -167,26 +166,11 @@
       if (it.classList.contains("hidden")) { cols[0].appendChild(it); return; }
       cols.reduce(function (a, b) { return b.offsetHeight < a.offsetHeight ? b : a; }).appendChild(it);
     });
-    markClamped();
-  }
-  // "Read more" only on tweets whose text is actually cut off.
-  function markClamped() {
-    list.querySelectorAll(".tw:not(.expanded) > .tw-row .tw-body > .tw-text").forEach(function (el) {
-      var body = el.parentNode;
-      if (el.scrollHeight > el.clientHeight + 2 && !body.querySelector(":scope > .readmore")) {
-        var b = document.createElement("button");
-        b.className = "readmore"; b.textContent = "Read more";
-        b.addEventListener("click", function () { el.closest(".tw").classList.add("expanded"); b.remove(); });
-        el.insertAdjacentElement("afterend", b);
-      }
-    });
+    window.mbrReadMore && window.mbrReadMore(list);
   }
   layout();
   var w = innerWidth;
   addEventListener("resize", function () { if (innerWidth !== w) { w = innerWidth; layout(); } });
-  document.querySelectorAll("#notable-list img").forEach(function (img) {
-    if (!img.complete) img.addEventListener("load", function () { markClamped(); }, { once: true });
-  });
   var mm = document.getElementById("models-more");
   if (mm) mm.addEventListener("click", function () {
     document.querySelectorAll(".models > .mc.hidden").forEach(function (c) { c.classList.remove("hidden"); });
