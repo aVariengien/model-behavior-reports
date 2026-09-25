@@ -66,6 +66,7 @@
   function paint() {
     cards.forEach(function (c, i) { c.classList.toggle("hidden", i >= shown); });
     more.classList.toggle("hidden", shown >= cards.length);
+    window.mbrReadMore && window.mbrReadMore(list);
   }
   function sort(key) {
     cards.sort(function (a, b) {
