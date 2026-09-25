@@ -15,6 +15,7 @@ from . import config, export, status
 TEMPLATES = Path(__file__).parent / "templates"
 NOTABLE_N = 50
 LATEST_N = 40
+TOP_REPORTERS = 30  # on the homepage: 5 shown, the rest behind "Show more"
 MODEL_PAGE_MAX = 600
 
 TOKEN_RE = re.compile(r"(https?://\S+|@\w{1,15}|#\w+)")
@@ -173,12 +174,14 @@ def build(con, out_dir: Path = config.OUT_DIR):
     latest = reports(f"SELECT r.* FROM reports r WHERE {SHOWN} ORDER BY r.created_at DESC LIMIT {LATEST_N}",
                      config.MIN_SCORE)
 
+    # Everyone with a shown report, ranked by 10 x models covered + reports.
     reporters = []
-    for row in q(f"SELECT t.username, MAX(t.display_name) name, MAX(CASE WHEN t.avatar LIKE 'http%' THEN t.avatar END) avatar, COUNT(DISTINCT r.tweet_id) n, "
+    for row in q(f"SELECT MAX(t.username) username, MAX(t.display_name) name, "
+                 f"MAX(CASE WHEN t.avatar LIKE 'http%' THEN t.avatar END) avatar, COUNT(DISTINCT r.tweet_id) n, "
                  f"COUNT(DISTINCT j.value) nm FROM reports r JOIN tweets t USING(tweet_id), json_each(r.models) j "
-                 f"WHERE {SHOWN} AND t.username IS NOT NULL GROUP BY lower(t.username) "
-                 f"ORDER BY 10 * COUNT(DISTINCT j.value) + COUNT(DISTINCT r.tweet_id) DESC LIMIT 5", config.MIN_SCORE):
-        reporters.append(dict(row, avatar=avatar(row["avatar"], "200x200")))
+                 f"WHERE {SHOWN} AND COALESCE(t.username,'') != '' GROUP BY lower(t.username) "
+                 f"ORDER BY 10 * COUNT(DISTINCT j.value) + COUNT(DISTINCT r.tweet_id) DESC", config.MIN_SCORE):
+        reporters.append(dict(row, avatar=avatar(row["avatar"], "200x200"), key=row["username"].lower()))
 
     total = q(f"SELECT COUNT(*) n, COUNT(DISTINCT lower(t.username)) people FROM reports r "
               f"JOIN tweets t USING(tweet_id) WHERE {SHOWN}", config.MIN_SCORE)[0]
@@ -196,7 +199,7 @@ def build(con, out_dir: Path = config.OUT_DIR):
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir(parents=True)
     (tmp / "index.html").write_text(env.get_template("index.html").render(
-        **common, notable=notable, latest=latest, models=models, reporters=reporters))
+        **common, notable=notable, latest=latest, models=models, reporters=reporters[:TOP_REPORTERS]))
     items_by_slug = {}
     for m in models:
         items = items_by_slug[m["slug"]] = reports(f"SELECT r.* FROM reports r JOIN tweets t USING(tweet_id), json_each(r.models) j "
@@ -206,6 +209,21 @@ def build(con, out_dir: Path = config.OUT_DIR):
         page.mkdir(parents=True)
         (page / "index.html").write_text(env.get_template("model.html").render(
             **common, model=m, items=items, models=models))
+    by_model = {m["slug"]: m for m in models}
+    for p in reporters:
+        items = reports(f"SELECT r.* FROM reports r JOIN tweets t USING(tweet_id) "
+                        f"WHERE lower(t.username)=? AND {SHOWN} "
+                        f"ORDER BY mbr_rank(r.quotes, t.retweets, r.score) DESC, t.likes DESC", p["key"], config.MIN_SCORE)
+        per_model = {}
+        for t in items:
+            for m in t["models"]:
+                per_model[m["slug"]] = per_model.get(m["slug"], 0) + 1
+        chips = [dict(by_model.get(slug) or config.MODEL_BY_SLUG[slug], count=n)
+                 for slug, n in sorted(per_model.items(), key=lambda kv: -kv[1])]
+        page = tmp / "reporter" / p["key"]
+        page.mkdir(parents=True)
+        (page / "index.html").write_text(env.get_template("reporter.html").render(
+            **common, person=p, items=items, chips=chips, visible={m["slug"] for m in models}))
     (tmp / "status").mkdir()
     (tmp / "status" / "index.html").write_text(env.get_template("status.html").render(**common, s=status.collect(con)))
     (tmp / "about").mkdir()

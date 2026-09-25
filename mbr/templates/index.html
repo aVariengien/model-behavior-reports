@@ -135,9 +135,9 @@
 
 <section id="reporters">
   <h2>Top Reporters</h2>
-  <div class="people">
+  <div class="people" id="people">
     {% for p in reporters %}
-    <a class="person" href="https://x.com/{{ p.username }}" target="_blank" rel="noopener">
+    <a class="person{{ ' hidden' if loop.index > 5 }}" href="/reporter/{{ p.key }}/">
       {% if p.avatar %}<img class="av" src="{{ p.avatar }}" alt="" loading="lazy" width="64" height="64" data-initial="{{ p.username[0] }}">{% else %}<span class="av av-ph">{{ p.username[0]|upper }}</span>{% endif %}
       <span class="nm">{{ p.name or p.username }}</span>
       <span class="hd">@{{ p.username }}</span>
@@ -145,6 +145,7 @@
     </a>
     {% endfor %}
   </div>
+  {% if reporters|length > 5 %}<div class="more-row"><button class="btn" id="people-more">Show more</button></div>{% endif %}
 </section>
 </main>
 {% endblock %}
@@ -171,6 +172,12 @@
   layout();
   var w = innerWidth;
   addEventListener("resize", function () { if (innerWidth !== w) { w = innerWidth; layout(); } });
+  var pm = document.getElementById("people-more");
+  if (pm) pm.addEventListener("click", function () {
+    var hidden = document.querySelectorAll("#people > .person.hidden");
+    for (var i = 0; i < Math.min(10, hidden.length); i++) hidden[i].classList.remove("hidden");
+    if (hidden.length <= 10) pm.remove();
+  });
   var mm = document.getElementById("models-more");
   if (mm) mm.addEventListener("click", function () {
     document.querySelectorAll(".models > .mc.hidden").forEach(function (c) { c.classList.remove("hidden"); });

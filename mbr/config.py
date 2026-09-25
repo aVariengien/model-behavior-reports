@@ -81,6 +81,9 @@ BASE_MODELS = [
          aliases=["opus 5", "opus5", "claude-opus-5"], generic=["claude opus"]),
     dict(slug="claude-fable-5", name="Claude Fable 5", lab="anthropic", released="2026-06-09",
          aliases=["fable 5", "fable5", "claude-fable-5"], generic=["claude fable"]),
+    # No family name: in 2026 "claude opus" meant Opus 4.x/5.x, never Opus 3.
+    dict(slug="claude-opus-3", name="Claude Opus 3", lab="anthropic", released="2024-03-04",
+         aliases=["claude 3 opus", "claude-3-opus", "claude opus 3", "opus 3", "c3 opus", "3 opus"], generic=[]),
     dict(slug="claude-sonnet-5", name="Claude Sonnet 5", lab="anthropic", released="2026-04-21",
          aliases=["sonnet 5", "sonnet5", "claude-sonnet-5"], generic=["claude sonnet"]),
     dict(slug="gpt-6-sol", name="GPT-6 Sol", lab="openai", released="2026-09-15",
