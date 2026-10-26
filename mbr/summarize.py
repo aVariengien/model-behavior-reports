@@ -2,9 +2,9 @@
 
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
-from . import config, llm, runlog
+from . import config, db, llm, runlog
 from .classify import context_for
 
 SCHEMA = {
@@ -72,17 +72,17 @@ def count_shown(con, slug) -> int:
 
 def summarize(con, force=False):
     now = datetime.now(timezone.utc)
+    today = now.date().isoformat()
+    if not force and (now.hour < config.SUMMARY_HOUR_UTC or db.get_state(con, "summaries_day") == today):
+        return
     for m in config.MODELS:
         n = count_shown(con, m["slug"])
         if n < config.MIN_MODEL_REPORTS:
             continue
         old = con.execute("SELECT * FROM model_summaries WHERE slug=?", (m["slug"],)).fetchone()
-        if old and not force:
-            fresh = now - datetime.fromisoformat(old["updated_at"]) < timedelta(hours=config.SUMMARY_EVERY_HOURS)
-            # Reports removed (e.g. keyword changes): the summary may cite them, rewrite now.
-            shrunk = n < old["n_reports"]
-            if not shrunk and (fresh or n - old["n_reports"] < config.SUMMARY_MIN_NEW):
-                continue
+        # Reports removed (e.g. keyword changes): the summary may cite them, so rewrite it too.
+        if old and not force and n >= old["n_reports"] and n - old["n_reports"] < config.SUMMARY_MIN_NEW:
+            continue
         rows = _reports_for(con, m["slug"])
         blocks = []
         for i, r in enumerate(rows, 1):
@@ -91,15 +91,16 @@ def summarize(con, force=False):
                           f"\nGist: {r['behavior']}\n{text}")
         print(f"summarizing {m['name']} from {len(rows)} reports with {config.SUMMARY_MODEL}", flush=True)
         prompt = PROMPT.format(n=len(rows), name=m["name"], reports="\n".join(blocks))
-        out = llm.chat_json(config.SUMMARY_MODEL, prompt, SCHEMA, "model_summary", max_tokens=6000, purpose="summaries")
+        out = llm.claude_json(config.SUMMARY_MODEL, prompt, SCHEMA, purpose="summaries")
         issues = _problems(out, len(rows))
         if issues:
             print(f"  counts look wrong ({'; '.join(issues)}), rewriting once", flush=True)
-            out = llm.chat_json(config.SUMMARY_MODEL, prompt + "\n\n## Correction\nA previous draft had these errors: "
-                                + "; ".join(issues) + ". Recount from the report numbers.",
-                                SCHEMA, "model_summary", max_tokens=6000, purpose="summaries")
+            out = llm.claude_json(config.SUMMARY_MODEL, prompt + "\n\n## Correction\nA previous draft had these errors: "
+                                  + "; ".join(issues) + ". Recount from the report numbers.",
+                                  SCHEMA, purpose="summaries")
         con.execute("INSERT OR REPLACE INTO model_summaries VALUES (?,?,?,?,?,?)",
                     (m["slug"], out["one_liner"].strip(), out["aggregate"].strip(), out["portrait"].strip(),
                      n, now.isoformat(timespec="seconds")))
         con.commit()
         runlog.add("summaries")
+    db.set_state(con, "summaries_day", today)

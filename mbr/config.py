@@ -4,6 +4,7 @@ import json
 import math
 import os
 import re
+import shutil
 from pathlib import Path
 
 ROOT = Path(os.environ.get("MBR_ROOT", Path(__file__).resolve().parent.parent))
@@ -24,7 +25,9 @@ CA_ANON_KEY = (
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 CLASSIFY_MODEL = "google/gemini-3.8-flash"
-SUMMARY_MODEL = "anthropic/claude-opus-5.5"
+# Summaries run through the Claude Code CLI on a logged-in Claude subscription, not OpenRouter.
+SUMMARY_MODEL = "claude-opus-5-5"
+CLAUDE_BIN = os.environ.get("CLAUDE_BIN") or shutil.which("claude") or str(Path.home() / ".local/bin/claude")
 CLASSIFY_MODEL_NAME = "Gemini 3.8 Flash"
 CLASSIFY_REASONING = "low"  # A/B test on 50 graded tweets: 49/50 agree, ~half the cost
 SUMMARY_MODEL_NAME = "Claude Opus 5.5"
@@ -34,8 +37,8 @@ MAX_REPLIES = 10           # replies kept per report (most liked)
 CLASSIFY_PER_RUN = 400     # cap per hourly run, newest first; backfill drains gradually
 MIN_SCORE = 4              # interestingness needed to be shown on the site
 MIN_MODEL_REPORTS = 5      # models with fewer shown reports are hidden
-SUMMARY_EVERY_HOURS = 24   # regenerate a model summary at most this often
-SUMMARY_MIN_NEW = 3        # ...and only if at least this many new reports arrived
+SUMMARY_HOUR_UTC = 4       # summaries are rewritten in one batch a day, on the first run after this hour
+SUMMARY_MIN_NEW = 3        # ...and only for models with at least this many new reports
 SUMMARY_MAX_REPORTS = 150  # reports fed to the summarizer per model
 
 # Ranking: quotes by archive accounts dominate; retweets count on a log scale

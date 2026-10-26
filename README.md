@@ -17,7 +17,8 @@ Every hour, `mbr update`:
 3. **Grades** each candidate with Gemini 3.8 Flash (text + screenshots): is it a *behavior* report, which models
    does it really discuss, and how interesting is it (1-10) (`mbr/classify.py`).
 4. **Counts quotes**: distinct archive accounts that quote-tweeted each report.
-5. **Summarizes** each model with Claude Opus 5.5, at most daily and only when new reports arrived (`mbr/summarize.py`).
+5. **Summarizes** each model with Claude Opus 5.5, in one batch a day (first run after 04:00 UTC), only for models with new reports (`mbr/summarize.py`).
+   This runs through the Claude Code CLI (`claude -p`) on a logged-in Claude subscription, so it has no per-token cost.
 6. **Checks OpenRouter** once a day for new models and adds them with generated keywords (`mbr/newmodels.py`).
 7. **Builds** a static site plus plain-text exports for LLMs (`/llms.txt`, `/llms-full.txt`, `/data/<model>.md`).
 
@@ -25,8 +26,8 @@ Reports are ranked by `50 × quotes + 20 × log2(1 + min(retweets, 100)) + 15 ×
 
 ## Running it
 
-Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/). All LLM calls go through
-[OpenRouter](https://openrouter.ai).
+Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/). LLM calls go through [OpenRouter](https://openrouter.ai),
+except summaries, which need [Claude Code](https://claude.com/claude-code) logged in (`claude` on `PATH`, or `CLAUDE_BIN`).
 
 ```bash
 uv sync
