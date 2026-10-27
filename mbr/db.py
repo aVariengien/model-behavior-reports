@@ -50,6 +50,11 @@ CREATE TABLE IF NOT EXISTS model_summaries (
 
 CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT);
 
+-- Quote tweets of known reports, collected by scans (the API can't list them).
+CREATE TABLE IF NOT EXISTS quotes (tweet_id TEXT PRIMARY KEY, quoted_tweet_id TEXT, account_id TEXT);
+CREATE INDEX IF NOT EXISTS quotes_quoted ON quotes(quoted_tweet_id);
+CREATE INDEX IF NOT EXISTS tweets_reply_to ON tweets(reply_to_tweet_id);
+
 CREATE TABLE IF NOT EXISTS runs (
     started_at TEXT, command TEXT, seconds INTEGER, status TEXT, error TEXT,
     counters TEXT, cost REAL

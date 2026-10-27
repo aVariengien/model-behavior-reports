@@ -5,9 +5,6 @@ from datetime import datetime, timedelta, timezone
 
 from . import archive, config, db, runlog
 
-SCAN_SELECT = ("tweet_id,created_at,updated_at,full_text,favorite_count,retweet_count,"
-               "reply_to_tweet_id")
-
 
 def _iso(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
@@ -17,44 +14,45 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def ingest(con, rows: list[dict]) -> int:
-    """Register new report candidates from a page of scanned tweets and refresh
-    counts of tweets we already hold. Returns the number of new candidates."""
-    cutoff = _iso(_now() - timedelta(days=config.WINDOW_DAYS))
+def _known(con, ids) -> set[str]:
+    ids = list(set(ids))
+    return {r[0] for r in con.execute(
+        f"SELECT tweet_id FROM reports WHERE tweet_id IN ({','.join('?' * len(ids))})", ids)} if ids else set()
 
-    # Engagement counts move after capture; keep ours current.
-    con.executemany(
-        "UPDATE tweets SET likes=MAX(likes,?), retweets=MAX(retweets,?) WHERE tweet_id=?",
-        [(r["favorite_count"] or 0, r["retweet_count"] or 0, r["tweet_id"]) for r in rows
-         if not r["full_text"].startswith("RT @")])
-    # A new reply to a known report: re-hydrate it to pick up the reply.
-    reply_parents = {r["reply_to_tweet_id"] for r in rows if r.get("reply_to_tweet_id")}
-    if reply_parents:
-        con.executemany("UPDATE reports SET hydrated=0 WHERE tweet_id=? AND hydrated=1",
-                        [(p,) for p in reply_parents])
+
+def _set_replies(con, tids):
+    """Keep each report's most-liked replies, from the replies we have seen in scans."""
+    for tid in tids:
+        ids = [r[0] for r in con.execute("SELECT tweet_id FROM tweets WHERE reply_to_tweet_id=? "
+                                         "ORDER BY likes DESC LIMIT ?", (tid, config.MAX_REPLIES))]
+        con.execute("UPDATE reports SET reply_ids=? WHERE tweet_id=?", (json.dumps(ids), tid))
+
+
+def ingest(con, rows: list[dict]) -> int:
+    """Register new report candidates from a page of scanned tweets, refresh counts of
+    tweets we already hold, and record replies to and quotes of known candidates.
+    Returns the number of new candidates."""
+    cutoff = _iso(_now() - timedelta(days=config.WINDOW_DAYS))
+    is_rt = lambda r: r["retweeted_tweet_id"] or r["full_text"].startswith("RT @")  # noqa: E731
+    retweets = [r for r in rows if is_rt(r)]
+    rows = [r for r in rows if not is_rt(r)]
+
+    # Engagement counts move after capture; keep ours current. Retweets carry the
+    # original's current retweet count.
+    con.executemany("UPDATE tweets SET likes=MAX(likes,?), retweets=MAX(retweets,?) WHERE tweet_id=?",
+                    [(r["likes"], r["retweets"], r["tweet_id"]) for r in rows])
+    con.executemany("UPDATE tweets SET retweets=MAX(retweets,?) WHERE tweet_id=?",
+                    [(r["retweets"], r["retweeted_tweet_id"]) for r in retweets if r["retweeted_tweet_id"]])
 
     found: dict[str, set[str]] = {}
-    retweets: dict[str, tuple[set[str], dict]] = {}
     for r in rows:
         if r["created_at"] < cutoff:
             continue
         models = config.match_models(r["full_text"], r["created_at"])
-        if not models:
-            continue
-        if r["full_text"].startswith("RT @"):
-            retweets[r["tweet_id"]] = (set(models), r)
-        else:
+        if models:
             found.setdefault(r["tweet_id"], set()).update(models)
 
-    # Retweets are not reports, but they carry the original's current retweet
-    # count; use it to refresh originals we already hold.
-    if retweets:
-        for rt_id, orig_id in archive.retweet_targets(retweets).items():
-            if orig_id:
-                con.execute("UPDATE tweets SET retweets=MAX(retweets,?) WHERE tweet_id=?",
-                            (retweets[rt_id][1]["retweet_count"] or 0, orig_id))
-
-    runlog.add("scanned", len(rows))
+    runlog.add("scanned", len(rows) + len(retweets))
     new = 0
     for tid, models in found.items():
         old = con.execute("SELECT candidates FROM reports WHERE tweet_id=?", (tid,)).fetchone()
@@ -68,54 +66,85 @@ def ingest(con, rows: list[dict]) -> int:
             con.execute("INSERT INTO reports(tweet_id, candidates) VALUES (?,?)",
                         (tid, json.dumps(sorted(models))))
             new += 1
+
+    # The API can't list a tweet's replies or quotes, so we collect them as they pass by.
+    known = _known(con, [r["reply_to_tweet_id"] for r in rows if r["reply_to_tweet_id"]]
+                   + [r["quoted_tweet_id"] for r in rows if r["quoted_tweet_id"]])
+    replies = [r for r in rows if r["reply_to_tweet_id"] in known]
+    for r in replies:
+        db.upsert_tweet(con, r)
+    _set_replies(con, {r["reply_to_tweet_id"] for r in replies})
+    con.executemany("INSERT OR IGNORE INTO quotes(tweet_id, quoted_tweet_id, account_id) VALUES (?,?,?)",
+                    [(r["tweet_id"], r["quoted_tweet_id"], r["account_id"]) for r in rows
+                     if r["quoted_tweet_id"] in known and r["account_id"]])
     con.commit()
     runlog.add("candidates", new)
     return new
 
 
 def backfill(con, days: int):
-    """Scan every tweet created in the last `days` days (resumable)."""
-    started = _iso(_now())
-    since = _iso(_now() - timedelta(days=days))
-    until = db.get_state(con, "backfill_cursor")
-    if not db.get_state(con, "updated_cursor"):
-        db.set_state(con, "updated_cursor", started)
+    """Scan every tweet created in the last `days` days, a day at a time (resumable)."""
+    day = datetime.fromisoformat(db.get_state(con, "backfill_day") or _iso(_now() - timedelta(days=days)))
     total = new = 0
-    for page in archive.scan("created_at", since, until, select=SCAN_SELECT):
-        total += len(page)
-        new += ingest(con, page)
-        db.set_state(con, "backfill_cursor", page[-1]["created_at"])
-        if total % 20000 < len(page):
-            print(f"  backfill: {total} scanned, {new} candidates, at {page[-1]['created_at']}", flush=True)
-    db.set_state(con, "backfill_cursor", "")
+    while day < _now():
+        for page in archive.scan(day, min(day + timedelta(days=1), _now())):
+            total += len(page)
+            new += ingest(con, page)
+        day += timedelta(days=1)
+        db.set_state(con, "backfill_day", _iso(day))
+        print(f"  backfill: {total} scanned, {new} candidates, at {day.date()}", flush=True)
+    db.set_state(con, "backfill_day", "")
+    if not db.get_state(con, "created_cursor"):
+        db.set_state(con, "created_cursor", _iso(_now()))
     print(f"backfill done: {total} tweets scanned, {new} new candidates")
 
 
 def rescan(con, days: int):
     """Re-scan recent tweets, e.g. after new models or keywords were added."""
     total = new = 0
-    for page in archive.scan("created_at", _iso(_now() - timedelta(days=days)), select=SCAN_SELECT):
+    for page in archive.scan(_now() - timedelta(days=days), _now()):
         total += len(page)
         new += ingest(con, page)
     print(f"rescan: {total} tweets from the last {days} days, {new} new candidates")
 
 
 def incremental(con):
-    """Scan tweets inserted or updated since the last run."""
-    cursor = db.get_state(con, "updated_cursor") or _iso(_now() - timedelta(hours=2))
-    since = _iso(datetime.fromisoformat(cursor) - timedelta(minutes=10))
+    """Scan tweets created since the last run, re-reading OVERLAP_HOURS for late arrivals."""
+    started = _now()
+    cursor = datetime.fromisoformat(db.get_state(con, "created_cursor") or _iso(started - timedelta(hours=24)))
+    since = cursor - timedelta(hours=config.OVERLAP_HOURS)
     total = new = 0
-    newest = cursor
-    for page in archive.scan("updated_at", since, select=SCAN_SELECT):
+    for page in archive.scan(since, started):
         total += len(page)
         new += ingest(con, page)
-        newest = max(newest, page[0]["updated_at"])
-    db.set_state(con, "updated_cursor", newest)
-    print(f"incremental: {total} tweets scanned since {since}, {new} new candidates")
+    db.set_state(con, "created_cursor", _iso(started))
+    print(f"incremental: {total} tweets created since {_iso(since)}, {new} new candidates")
+
+
+def new_members(con):
+    """Archives uploaded late: scan the last WINDOW_DAYS of each new member, and of
+    members who now have an uploaded archive (opted-in accounts may upload later)."""
+    seen = db.get_state(con, "members")
+    current = {f"{m['account_id']}:{int(m['has_archive'])}" for m in archive.members()}
+    if seen is None:  # first run: nothing to catch up on
+        db.set_state(con, "members", json.dumps(sorted(current)))
+        return
+    seen = set(json.loads(seen))
+    since = _now() - timedelta(days=config.WINDOW_DAYS)
+    for key in sorted(current - seen):
+        account, has_archive = key.split(":")
+        if has_archive == "1":
+            total = new = 0
+            for page in archive.account_tweets(account, since):
+                total += len(page)
+                new += ingest(con, page)
+            print(f"members: scanned {total} tweets of new archive {account}, {new} new candidates", flush=True)
+        seen.add(key)
+        db.set_state(con, "members", json.dumps(sorted(seen)))
 
 
 def hydrate(con, batch: int = 200):
-    """Fetch full tweet, parent, quoted tweet and top replies for pending reports."""
+    """Fetch full tweet, parent and quoted tweet for pending reports."""
     while True:
         ids = [r["tweet_id"] for r in con.execute(
             "SELECT tweet_id FROM reports WHERE hydrated=0 LIMIT ?", (batch,))]
@@ -129,35 +158,34 @@ def hydrate(con, batch: int = 200):
             f"SELECT quoted_tweet_id FROM tweets WHERE tweet_id IN ({','.join('?' * len(ids))}) "
             "AND quoted_tweet_id IS NOT NULL", ids)}
         extra = archive.fetch_tweets(related - set(main)) if related else {}
-        replies = archive.fetch_top_replies(ids, config.MAX_REPLIES)
-        for t in [*main.values(), *extra.values(), *(r for rs in replies.values() for r in rs)]:
+        for t in [*main.values(), *extra.values()]:
             db.upsert_tweet(con, t)
+        _set_replies(con, ids)
         for tid in ids:
             t = con.execute("SELECT created_at FROM tweets WHERE tweet_id=?", (tid,)).fetchone()
-            reply_ids = [r["tweet_id"] for r in replies.get(tid, [])]
-            con.execute("UPDATE reports SET hydrated=1, reply_ids=?, created_at=? WHERE tweet_id=?",
-                        (json.dumps(reply_ids), t["created_at"] if t else None, tid))
+            con.execute("UPDATE reports SET hydrated=1, created_at=? WHERE tweet_id=?",
+                        (t["created_at"] if t else None, tid))
         con.commit()
         runlog.add("hydrated", len(ids))
         print(f"  hydrated {len(ids)} reports", flush=True)
 
 
-def refresh_quotes(con, days: int = 30):
-    """Count distinct archive accounts quoting each shown report (author excluded).
-    Recent reports are refreshed every run; older ones once."""
-    since = _iso(_now() - timedelta(days=days))
-    rows = con.execute(
-        "SELECT r.tweet_id, t.account_id FROM reports r JOIN tweets t USING(tweet_id) "
-        "WHERE r.is_report=1 AND (r.created_at >= ? OR r.quotes_at IS NULL)", (since,)).fetchall()
-    if not rows:
-        return
-    quoters = archive.quoting_accounts([r["tweet_id"] for r in rows])
-    now = _iso(_now())
-    con.executemany("UPDATE reports SET quotes=?, quotes_at=? WHERE tweet_id=?",
-                    [(len(quoters.get(r["tweet_id"], set()) - {r["account_id"]}), now, r["tweet_id"]) for r in rows])
+def refresh_quotes(con):
+    """Count distinct archive accounts quoting each report (author excluded), from the
+    quotes collected by scans."""
+    con.execute("UPDATE reports SET quotes=(SELECT COUNT(DISTINCT q.account_id) FROM quotes q, tweets t "
+                "WHERE q.quoted_tweet_id=reports.tweet_id AND t.tweet_id=reports.tweet_id "
+                "AND q.account_id IS NOT t.account_id), quotes_at=? WHERE is_report=1", (_iso(_now()),))
     con.commit()
-    print(f"quotes: refreshed {len(rows)} reports, {sum(1 for r in rows if quoters.get(r['tweet_id']))} quoted")
 
+
+def seed_quotes(con):
+    """One-off, before the old API shuts down: copy existing quotes of reports into the quotes table."""
+    ids = [r[0] for r in con.execute("SELECT tweet_id FROM reports WHERE is_report=1")]
+    rows = archive.legacy_quoting_tweets(ids)
+    con.executemany("INSERT OR IGNORE INTO quotes(tweet_id, quoted_tweet_id, account_id) VALUES (?,?,?)", rows)
+    con.commit()
+    print(f"quotes: seeded {len(rows)} quotes of {len(ids)} reports")
 
 
 def rematch(con):

@@ -13,4 +13,4 @@ Environment=MBR_ROOT=/opt/modelbehavior
 Environment=MBR_OUT=/var/www/modelbehavior
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/opt/modelbehavior/.venv/bin/mbr update
-TimeoutStartSec=50min
+TimeoutStartSec=90min

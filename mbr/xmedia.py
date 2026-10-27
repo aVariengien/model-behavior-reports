@@ -79,7 +79,7 @@ def attach_videos(con, tweet_ids=None):
 
 def fill_authors(con):
     """Some archive accounts have a blank username/avatar; take them from X's embed data,
-    falling back to the archive's mentioned_users table for the name."""
+    falling back to the archive's account record."""
     from . import archive
     rows = con.execute("SELECT account_id, MIN(tweet_id) tweet_id FROM tweets "
                        "WHERE COALESCE(username,'')='' AND account_id IS NOT NULL GROUP BY account_id").fetchall()
@@ -88,20 +88,17 @@ def fill_authors(con):
     with ThreadPoolExecutor(4) as pool:
         users = list(pool.map(lambda r: tweet_result(r["tweet_id"]).get("user") or {}, rows))
     missing = [r["account_id"] for r, u in zip(rows, users) if not u.get("screen_name")]
-    mentioned = {}
-    for i in range(0, len(missing), 80):
-        for m in archive.get("mentioned_users", [("select", "user_id,screen_name,name"),
-                                                 ("user_id", f"in.({','.join(missing[i:i + 80])})")]):
-            mentioned[m["user_id"]] = m
+    known = archive.accounts(missing) if missing else {}
     fixed = 0
     for r, u in zip(rows, users):
-        m = mentioned.get(r["account_id"], {})
-        handle = u.get("screen_name") or m.get("screen_name")
+        a = known.get(r["account_id"], {})
+        handle = u.get("screen_name") or a.get("username")
         if not handle:
             continue
         con.execute("UPDATE tweets SET username=?, display_name=?, avatar=COALESCE(NULLIF(avatar,''), ?) "
                     "WHERE account_id=? AND COALESCE(username,'')=''",
-                    (handle, u.get("name") or m.get("name") or handle, u.get("profile_image_url_https"),
+                    (handle, u.get("name") or a.get("account_display_name") or handle,
+                     u.get("profile_image_url_https") or a.get("avatar_media_url"),
                      r["account_id"]))
         fixed += 1
     con.commit()

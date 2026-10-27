@@ -56,7 +56,7 @@ def collect(con) -> dict:
         now=now.isoformat(timespec="seconds"), table=table, peak=peak, purposes=purposes, runs=runs,
         last_ok=last_ok, credits=_credits(), tracking_since=tracking_since,
         avg_week=sum(week) / 7 if week else 0, month=sum(t["total"] for t in table),
-        pipeline=dict(pipeline), cursor=db.get_state(con, "updated_cursor"),
+        pipeline=dict(pipeline), cursor=db.get_state(con, "created_cursor"),
         models_checked=db.get_state(con, "models_checked_at"),
         summaries=q("SELECT slug, updated_at, n_reports FROM model_summaries ORDER BY updated_at DESC"),
         timer_minutes=60,

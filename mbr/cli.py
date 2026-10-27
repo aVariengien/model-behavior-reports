@@ -20,15 +20,16 @@ def main():
     s.add_argument("--force", action="store_true")
     sub.add_parser("build")
     sub.add_parser("quotes", help="refresh quote counts")
+    sub.add_parser("seed-quotes", help="one-off: copy quotes of reports from the retired Supabase API")
     sub.add_parser("videos", help="look up playable video URLs")
     sub.add_parser("stats")
     sub.add_parser("serve-editor", help="keyword-editing API for /status/ (127.0.0.1:3004)")
     sub.add_parser("check-models", help="look for new models on OpenRouter now")
     sub.add_parser("rematch", help="re-run keyword matching on stored reports")
     rs = sub.add_parser("rescan", help="re-scan recent tweets for keyword matches (no grading)")
-    rs.add_argument("--days", type=int, default=config.WINDOW_DAYS)
+    rs.add_argument("--days", type=int, default=config.RESCAN_DAYS)
     r = sub.add_parser("rekey", help="after keyword edits: rematch, rescan, grade, rebuild")
-    r.add_argument("--days", type=int, default=config.WINDOW_DAYS)
+    r.add_argument("--days", type=int, default=config.RESCAN_DAYS)
     args = p.parse_args()
     if args.cmd == "serve-editor":
         from . import editor
@@ -56,6 +57,7 @@ def main():
             except Exception as e:  # noqa: BLE001 — never let the model check block the hourly update
                 print(f"models: check failed: {e!r}")
             collect.incremental(con)
+            collect.new_members(con)
             collect.hydrate(con)
             xmedia.attach_videos(con)
             xmedia.fill_authors(con)
@@ -74,6 +76,9 @@ def main():
             xmedia.fill_authors(con)
             xmedia.fill_avatars(con, limit=5000)
         elif args.cmd == "quotes":
+            collect.refresh_quotes(con)
+        elif args.cmd == "seed-quotes":
+            collect.seed_quotes(con)
             collect.refresh_quotes(con)
         elif args.cmd == "build":
             build.build(con)

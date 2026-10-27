@@ -16,9 +16,10 @@ GITHUB_URL = "https://github.com/aVariengien/model-behavior-reports"
 UMAMI_SCRIPT = "https://analytics.kenno.space/script.js"
 UMAMI_WEBSITE_ID = os.environ.get("MBR_UMAMI_ID", "")
 
-CA_URL = "https://fabxmporizzqflnftavs.supabase.co/rest/v1/"
-# Public anon key, published in https://www.community-archive.org/llms.txt
-CA_ANON_KEY = (
+CA_URL = "https://analytics.community-archive.org/v1/"  # needs CA_API_KEY (community-archive.org/settings/api-keys)
+CA_PER_MINUTE = 55  # key limit is 60/min and 20,000/day
+# Public anon key of the retired Supabase API, only used to seed quotes once (dead after 2026-11-19).
+CA_LEGACY_KEY = (
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6"
     "ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8"
 )
@@ -33,6 +34,8 @@ CLASSIFY_REASONING = "low"  # A/B test on 50 graded tweets: 49/50 agree, ~half t
 SUMMARY_MODEL_NAME = "Claude Opus 5.5"
 
 WINDOW_DAYS = 180          # only keep tweets younger than this
+RESCAN_DAYS = 30           # re-scan depth after keyword edits (~150 API calls per day of tweets)
+OVERLAP_HOURS = 6          # hourly scan re-reads this much, for tweets that reach the archive late
 MAX_REPLIES = 10           # replies kept per report (most liked)
 CLASSIFY_PER_RUN = 400     # cap per hourly run, newest first; backfill drains gradually
 MIN_SCORE = 4              # interestingness needed to be shown on the site
