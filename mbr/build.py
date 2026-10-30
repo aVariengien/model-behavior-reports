@@ -186,6 +186,15 @@ def build(con, out_dir: Path = config.OUT_DIR):
     total = q(f"SELECT COUNT(*) n, COUNT(DISTINCT lower(t.username)) people FROM reports r "
               f"JOIN tweets t USING(tweet_id) WHERE {SHOWN}", config.MIN_SCORE)[0]
 
+    # Homepage timeline: shown reports per model per day.
+    timeline = {m["slug"]: {} for m in models}
+    for row in q(f"SELECT j.value slug, substr(r.created_at, 1, 10) day, COUNT(*) n "
+                 f"FROM reports r, json_each(r.models) j WHERE {SHOWN} GROUP BY slug, day", config.MIN_SCORE):
+        if row["slug"] in timeline:
+            timeline[row["slug"]][row["day"]] = row["n"]
+    timeline = dict(today=now.date().isoformat(),
+                    models=[dict(slug=m["slug"], name=m["name"], lab=m["lab"], color=m["color"], days=timeline[m["slug"]]) for m in models])
+
     env = Environment(loader=FileSystemLoader(TEMPLATES), autoescape=True)
     env.filters["compact"] = compact
     common = dict(site=config.SITE_URL, umami_script=config.UMAMI_SCRIPT, umami_id=config.UMAMI_WEBSITE_ID,
@@ -199,7 +208,8 @@ def build(con, out_dir: Path = config.OUT_DIR):
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir(parents=True)
     (tmp / "index.html").write_text(env.get_template("index.html").render(
-        **common, notable=notable, latest=latest, models=models, reporters=reporters[:TOP_REPORTERS]))
+        **common, notable=notable, latest=latest, models=models, reporters=reporters[:TOP_REPORTERS],
+        timeline=timeline))
     items_by_slug = {}
     for m in models:
         items = items_by_slug[m["slug"]] = reports(f"SELECT r.* FROM reports r JOIN tweets t USING(tweet_id), json_each(r.models) j "

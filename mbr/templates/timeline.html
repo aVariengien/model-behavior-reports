@@ -1,0 +1,283 @@
+<section class="tl" id="timeline">
+<style>
+.tl-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px 20px; margin-bottom: 14px; }
+.tl-head h2 { margin: 0; }
+.tl-ctrl { display: flex; align-items: center; gap: 10px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; background: var(--surface); }
+.seg button { font: 500 12.5px var(--mono); color: var(--muted); background: none; border: 0; border-radius: 999px; padding: 5px 11px; cursor: pointer; }
+.seg button:hover { color: var(--text); }
+.seg button.on { color: var(--text); background: var(--surface-2); }
+.pick { position: relative; }
+.pick > .btn { padding: 7px 14px; }
+.pick-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; width: 280px; max-height: 360px; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 28px #0000001a; padding: 6px; }
+.pick-top { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px 8px; font-size: 12.5px; color: var(--muted); border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.pick-top button { font: 500 12.5px var(--sans); color: var(--link); background: none; border: 0; cursor: pointer; padding: 0; }
+.pick-menu label { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px; font-size: 13.5px; cursor: pointer; }
+.pick-menu label:hover { background: var(--surface-2); }
+.pick-menu label.off { opacity: .45; cursor: default; }
+.pick-menu input { margin: 0; accent-color: var(--text); }
+.tl .sw { width: 22px; height: 8px; flex: none; overflow: visible; }
+.tl .sw line { stroke-width: 2; stroke-linecap: round; }
+.pick-menu .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-menu .ct { font: 11.5px var(--mono); color: var(--muted); }
+.tl-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 10px; font-size: 13px; color: var(--text-2); }
+.tl-legend a { display: inline-flex; align-items: center; gap: 6px; }
+.tl-legend a:hover { color: var(--text); }
+.tl-legend .ct { font: 11.5px var(--mono); color: var(--muted); }
+.tl-plot { position: relative; }
+.tl-plot svg { display: block; width: 100%; height: 280px; overflow: visible; }
+.tl-plot .grid { stroke: var(--line); stroke-width: 1; }
+.tl-plot .ax { font: 11px var(--mono); fill: var(--muted); }
+.tl-plot .ln { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; transition: opacity .15s; }
+.tl-plot.focus .ln:not(.hi) { opacity: .15; }
+.tl-plot .lbl { font: 11.5px var(--sans); fill: var(--text-2); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; }
+.tl-plot .pk { stroke: var(--bg); stroke-width: 1.5; }
+.tl-plot.focus .lbl:not(.hi), .tl-plot.focus .pk:not(.hi) { opacity: .25; }
+.tl-plot .xh { stroke: var(--muted); stroke-width: 1; }
+.tl-plot .dot { stroke: var(--bg); stroke-width: 2; }
+.tl-tip { position: absolute; top: 0; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 20px #00000014; padding: 8px 10px; font-size: 12.5px; min-width: 170px; }
+.tl-tip .d { font: 11.5px var(--mono); color: var(--muted); margin-bottom: 4px; }
+.tl-tip .r { display: flex; align-items: center; gap: 6px; line-height: 1.6; }
+.tl-tip .r .v { margin-left: auto; padding-left: 14px; font-family: var(--mono); }
+.tl-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; }
+@media (max-width: 640px) { .tl-plot svg { height: 220px; } .pick-menu { right: auto; left: 0; } }
+</style>
+  <div class="tl-head">
+    <h2>Reports over Time</h2>
+    <div class="tl-ctrl">
+      <div class="seg" id="tl-range">
+        <button data-days="30" class="on">1M</button><button data-days="91">3M</button><button data-days="182">6M</button><button data-days="365">1Y</button><button data-days="0">All</button>
+      </div>
+      <div class="pick">
+        <button class="btn" id="tl-pick-btn" aria-expanded="false">Models ▾</button>
+        <div class="pick-menu hidden" id="tl-menu"></div>
+      </div>
+    </div>
+  </div>
+  <div class="tl-legend" id="tl-legend"></div>
+  <div class="tl-plot" id="tl-plot"><svg id="tl-svg"></svg><div class="tl-tip hidden" id="tl-tip"></div></div>
+<script>
+(function () {
+  var DATA = {{ timeline|tojson }};
+  // Lines wear their provider's color; models of the same provider differ by dash style.
+  var DASHES = ["", "7 4", "0.1 4", "9 3 0.1 3", "14 4", "3 3", "9 3 0.1 3 0.1 3", "0.1 3 0.1 8"];
+  var MAX = 8, DAY = 864e5, NS = "http://www.w3.org/2000/svg";
+  var dayNum = function (s) { return Math.round(Date.parse(s + "T00:00:00Z") / DAY); };
+  var fmt = function (n, opts) { return new Date(n * DAY).toLocaleDateString("en-US", Object.assign({ timeZone: "UTC" }, opts)); };
+  // Today is still filling up, so the last bin ends yesterday.
+  var today = dayNum(DATA.today) - 1, first = today;
+  var models = DATA.models.map(function (m) {
+    var days = {};
+    Object.keys(m.days).forEach(function (d) { var n = dayNum(d); days[n] = m.days[d]; if (n < first) first = n; });
+    return { slug: m.slug, name: m.name, lab: m.lab, color: m.color, days: days };
+  });
+  var bySlug = {}; models.forEach(function (m) { bySlug[m.slug] = m; });
+
+  // State. A model keeps its dash style while it stays selected; new picks take the
+  // first style free within their provider, so the provider's top model is solid.
+  var range = 30, custom = false, selected = [], slot = {}, win;
+
+  function windowBins() {
+    var span = range ? range : today - first + 1;
+    // Up to 1M: one point per day. Longer: ~150 points, each counting the 7 days up to it,
+    // which keeps the detail of the long ranges without daily noise.
+    var size = span <= 45 ? 1 : 7, every = Math.max(1, Math.ceil(span / 150));
+    var nb = Math.max(2, Math.floor((span - 1) / every) + 1), bins = [];
+    for (var i = 0; i < nb; i++) { var end = today - (nb - 1 - i) * every; bins.push({ start: end - size + 1, end: end }); }
+    var sum = function (m, a, b) { var n = 0; for (var d = a; d <= b; d++) n += m.days[d] || 0; return n; };
+    var totals = {}, series = {};
+    models.forEach(function (m) {
+      series[m.slug] = bins.map(function (b) { return sum(m, b.start, b.end); });
+      totals[m.slug] = sum(m, today - span + 1, today);
+    });
+    var ranked = models.slice().sort(function (a, b) { return totals[b.slug] - totals[a.slug]; });
+    return { bins: bins, size: size, span: span, series: series, totals: totals, ranked: ranked };
+  }
+
+  function setSelection(slugs) {
+    var keep = {}; slugs.forEach(function (s) { if (slot[s] !== undefined) keep[s] = slot[s]; });
+    slugs.forEach(function (s) {
+      if (keep[s] !== undefined) return;
+      var used = slugs.filter(function (o) { return keep[o] !== undefined && bySlug[o].lab === bySlug[s].lab; }).map(function (o) { return keep[o]; });
+      for (var i = 0; ; i++) if (used.indexOf(i) < 0) { keep[s] = i; break; }
+    });
+    slot = keep; selected = slugs;
+  }
+
+  function topN() { return win.ranked.filter(function (m) { return win.totals[m.slug] > 0; }).slice(0, MAX).map(function (m) { return m.slug; }); }
+
+  function el(tag, attrs, parent, text) {
+    var e = tag in { svg: 1, path: 1, line: 1, text: 1, circle: 1, g: 1, rect: 1 } ? document.createElementNS(NS, tag) : document.createElement(tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text !== undefined) e.textContent = text;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  function stroke(s) { return { stroke: bySlug[s].color, "stroke-dasharray": DASHES[slot[s]] || "" }; }
+  function swatch(s, parent) {
+    var g = el("svg", { class: "sw", viewBox: "0 0 22 8" }, parent);
+    if (s) el("line", Object.assign({ x1: 1, x2: 21, y1: 4, y2: 4 }, stroke(s)), g);
+  }
+
+  var svg = document.getElementById("tl-svg"), plot = document.getElementById("tl-plot"), tip = document.getElementById("tl-tip");
+  var legend = document.getElementById("tl-legend"), menu = document.getElementById("tl-menu"), pickBtn = document.getElementById("tl-pick-btn");
+  var geo = null;
+
+  function binLabel(b, long) {
+    if (win.size === 1) return fmt(b.end, { month: "short", day: "numeric" });
+    if (!long) return win.span > 400 ? fmt(b.end, { month: "short", year: "2-digit" }) : fmt(b.end, { month: "short", day: "numeric" });
+    return fmt(b.start, { month: "short", day: "numeric" }) + " – " + fmt(b.end, { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  function draw() {
+    svg.innerHTML = "";
+    var old = plot.querySelector(".tl-empty"); if (old) old.remove();
+    var W = svg.clientWidth, H = svg.clientHeight, L = 34, T = 22, B = 24;
+    var R = 8;
+    var iw = W - L - R, ih = H - T - B, nb = win.bins.length;
+    el("text", { class: "ax", x: 0, y: 10 }, svg, win.size === 1 ? "reports per day" : "reports in the past 7 days");
+    var max = 0;
+    selected.forEach(function (s) { win.series[s].forEach(function (v) { if (v > max) max = v; }); });
+    var step = Math.max(1, Math.pow(10, Math.floor(Math.log10(Math.max(max, 1) / 4))));
+    [1, 2, 5, 10].some(function (f) { if (max / (step * f) <= 4) { step *= f; return true; } });
+    var top = Math.max(step, Math.ceil(max / step) * step);
+    var x = function (i) { return L + (nb === 1 ? iw / 2 : i * iw / (nb - 1)); };
+    var y = function (v) { return T + ih - v / top * ih; };
+    for (var v = 0; v <= top; v += step) {
+      el("line", { class: "grid", x1: L, x2: W - R, y1: y(v), y2: y(v) }, svg);
+      el("text", { class: "ax", x: L - 8, y: y(v) + 4, "text-anchor": "end" }, svg, v);
+    }
+    // Evenly spaced ticks, counted back from the latest bin.
+    var every = Math.ceil(nb / Math.max(2, Math.floor(iw / 90)));
+    for (var i = nb - 1; i >= every / 2; i -= every)
+      el("text", { class: "ax", x: x(i), y: H - 4, "text-anchor": i === nb - 1 ? "end" : "middle" }, svg, binLabel(win.bins[i]));
+    selected.forEach(function (s) {
+      var d = win.series[s].map(function (v, i) { return (i ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1); }).join("");
+      el("path", Object.assign({ class: "ln", d: d, "data-slug": s }, stroke(s)), svg);
+    });
+    // Name each line at its peak, most reported first. A name goes above its dot, else to
+    // the right or left; it is skipped when it would land near a name already placed.
+    var boxes = [], PAD = 14;
+    selected.slice().sort(function (a, b) { return win.totals[b] - win.totals[a]; }).forEach(function (s) {
+      var vals = win.series[s], pi = vals.indexOf(Math.max.apply(null, vals));
+      if (!vals[pi]) return;
+      var px = x(pi), py = y(vals[pi]);
+      var t = el("text", { class: "lbl", "data-slug": s }, svg, bySlug[s].name);
+      var tw = t.getComputedTextLength(), th = 12;
+      var spots = [[px - tw / 2, py - 9], [px + 8, py + 4], [px - 8 - tw, py + 4]];
+      var fit = spots.map(function (p) {
+        var bx = Math.max(L, Math.min(W - R - tw, p[0]));
+        return { x: bx, y: p[1], x1: bx - PAD, x2: bx + tw + PAD, y1: p[1] - th - PAD, y2: p[1] + PAD };
+      }).filter(function (b) {
+        return b.y1 >= 12 - PAD && b.y2 <= T + ih + PAD && !boxes.some(function (o) {
+          return b.x1 < o.x2 && o.x1 < b.x2 && b.y1 < o.y2 && o.y1 < b.y2;
+        });
+      })[0];
+      if (!fit) return t.remove();
+      boxes.push(fit, { x1: px - 5, x2: px + 5, y1: py - 5, y2: py + 5 });
+      t.setAttribute("x", fit.x); t.setAttribute("y", fit.y);
+      el("circle", { class: "pk", cx: px, cy: py, r: 3.5, fill: bySlug[s].color, "data-slug": s }, svg);
+    });
+    if (!selected.length) el("div", { class: "tl-empty" }, plot, "Pick models to plot");
+    geo = { x: x, y: y, L: L, iw: iw, nb: nb, T: T, ih: ih };
+  }
+
+  function drawLegend() {
+    legend.innerHTML = "";
+    selected.slice().sort(function (a, b) { return win.totals[b] - win.totals[a]; }).forEach(function (s) {
+      var a = el("a", { href: "/model/" + s + "/", "data-slug": s }, legend);
+      swatch(s, a);
+      el("span", {}, a, bySlug[s].name);
+      el("span", { class: "ct" }, a, win.totals[s]);
+    });
+  }
+
+  function drawMenu() {
+    menu.innerHTML = "";
+    var head = el("div", { class: "pick-top" }, menu);
+    el("span", {}, head, selected.length + " / " + MAX + " selected");
+    if (custom) el("button", { type: "button", "data-reset": "1" }, head, "Reset to top " + MAX);
+    var full = selected.length >= MAX;
+    win.ranked.forEach(function (m) {
+      var on = selected.indexOf(m.slug) >= 0;
+      var lab = el("label", { class: !on && full ? "off" : "" }, menu);
+      var cb = el("input", { type: "checkbox", value: m.slug }, lab);
+      cb.checked = on; cb.disabled = !on && full;
+      swatch(on && m.slug, lab);
+      el("span", { class: "nm" }, lab, m.name);
+      el("span", { class: "ct" }, lab, win.totals[m.slug]);
+    });
+    pickBtn.textContent = "Models · " + selected.length + " ▾";
+  }
+
+  function render() {
+    win = windowBins();
+    if (!custom) setSelection(topN());
+    draw(); drawLegend(); drawMenu();
+  }
+
+  // Hover: crosshair snaps to the nearest bin; the tooltip lists every plotted model.
+  var xh = null, dots = [];
+  function clearHover() { tip.classList.add("hidden"); if (xh) xh.remove(); dots.forEach(function (d) { d.remove(); }); xh = null; dots = []; }
+  svg.addEventListener("pointermove", function (e) {
+    if (!geo || !selected.length) return;
+    var r = svg.getBoundingClientRect(), px = e.clientX - r.left;
+    var i = Math.max(0, Math.min(geo.nb - 1, Math.round((px - geo.L) / geo.iw * (geo.nb - 1))));
+    clearHover();
+    var cx = geo.x(i);
+    xh = el("line", { class: "xh", x1: cx, x2: cx, y1: geo.T, y2: geo.T + geo.ih }, svg);
+    var rows = selected.map(function (s) { return { s: s, v: win.series[s][i] }; }).sort(function (a, b) { return b.v - a.v; });
+    rows.forEach(function (row) { dots.push(el("circle", { class: "dot", cx: cx, cy: geo.y(row.v), r: 4.5, fill: bySlug[row.s].color }, svg)); });
+    tip.innerHTML = "";
+    el("div", { class: "d" }, tip, binLabel(win.bins[i], true));
+    rows.forEach(function (row) {
+      var d = el("div", { class: "r" }, tip);
+      swatch(row.s, d);
+      el("span", {}, d, bySlug[row.s].name);
+      el("span", { class: "v" }, d, row.v);
+    });
+    tip.classList.remove("hidden");
+    var tw = tip.offsetWidth, left = cx + 14;
+    if (left + tw > r.width) left = cx - 14 - tw;
+    tip.style.left = Math.max(0, left) + "px";
+  });
+  svg.addEventListener("pointerleave", clearHover);
+
+  // Legend hover highlights one line.
+  legend.addEventListener("pointerover", function (e) {
+    var a = e.target.closest("a"); if (!a) return;
+    plot.classList.add("focus");
+    svg.querySelectorAll(".ln, .lbl, .pk").forEach(function (p) { p.classList.toggle("hi", p.dataset.slug === a.dataset.slug); });
+  });
+  legend.addEventListener("pointerleave", function () { plot.classList.remove("focus"); });
+
+  document.getElementById("tl-range").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    this.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
+    range = +b.dataset.days; render();
+  });
+  pickBtn.addEventListener("click", function () {
+    var open = menu.classList.toggle("hidden") === false;
+    pickBtn.setAttribute("aria-expanded", open);
+  });
+  document.addEventListener("click", function (e) {
+    if (e.target.isConnected && !e.target.closest(".pick")) { menu.classList.add("hidden"); pickBtn.setAttribute("aria-expanded", "false"); }
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") menu.classList.add("hidden"); });
+  menu.addEventListener("click", function (e) {
+    if (!e.target.dataset.reset) return;
+    custom = false; render();
+  });
+  menu.addEventListener("change", function (e) {
+    var s = e.target.value, next = selected.filter(function (x) { return x !== s; });
+    if (e.target.checked) next.push(s);
+    custom = true; setSelection(next);
+    draw(); drawLegend(); drawMenu();
+  });
+  var w = innerWidth;
+  addEventListener("resize", function () { if (innerWidth !== w) { w = innerWidth; draw(); } });
+  render();
+})();
+</script>
+</section>
