@@ -61,7 +61,7 @@
   var DATA = {{ timeline|tojson }};
   // Lines wear their provider's color; models of the same provider differ by dash style.
   var DASHES = ["", "7 4", "0.1 4", "9 3 0.1 3", "14 4", "3 3", "9 3 0.1 3 0.1 3", "0.1 3 0.1 8"];
-  var MAX = 8, DAY = 864e5, NS = "http://www.w3.org/2000/svg";
+  var MAX = 8, TOP = 6, DAY = 864e5, NS = "http://www.w3.org/2000/svg";
   var dayNum = function (s) { return Math.round(Date.parse(s + "T00:00:00Z") / DAY); };
   var fmt = function (n, opts) { return new Date(n * DAY).toLocaleDateString("en-US", Object.assign({ timeZone: "UTC" }, opts)); };
   // Today is still filling up, so the last bin ends yesterday.
@@ -104,7 +104,7 @@
     slot = keep; selected = slugs;
   }
 
-  function topN() { return win.ranked.filter(function (m) { return win.totals[m.slug] > 0; }).slice(0, MAX).map(function (m) { return m.slug; }); }
+  function topN() { return win.ranked.filter(function (m) { return win.totals[m.slug] > 0; }).slice(0, TOP).map(function (m) { return m.slug; }); }
 
   function el(tag, attrs, parent, text) {
     var e = tag in { svg: 1, path: 1, line: 1, text: 1, circle: 1, g: 1, rect: 1 } ? document.createElementNS(NS, tag) : document.createElement(tag);
@@ -197,7 +197,7 @@
     menu.innerHTML = "";
     var head = el("div", { class: "pick-top" }, menu);
     el("span", {}, head, selected.length + " / " + MAX + " selected");
-    if (custom) el("button", { type: "button", "data-reset": "1" }, head, "Reset to top " + MAX);
+    if (custom) el("button", { type: "button", "data-reset": "1" }, head, "Reset to top " + TOP);
     var full = selected.length >= MAX;
     win.ranked.forEach(function (m) {
       var on = selected.indexOf(m.slug) >= 0;
