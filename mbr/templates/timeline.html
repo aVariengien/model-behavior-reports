@@ -136,7 +136,7 @@
     var W = svg.clientWidth, H = svg.clientHeight, L = 34, T = 22, B = 24;
     var R = 8;
     var iw = W - L - R, ih = H - T - B, nb = win.bins.length;
-    el("text", { class: "ax", x: 0, y: 10 }, svg, win.size === 1 ? "reports per day" : "reports in the past 7 days");
+    el("text", { class: "ax", x: 0, y: 10 }, svg, win.size === 1 ? "reports per day" : "reports in 7-day window");
     var max = 0;
     selected.forEach(function (s) { win.series[s].forEach(function (v) { if (v > max) max = v; }); });
     var step = Math.max(1, Math.pow(10, Math.floor(Math.log10(Math.max(max, 1) / 4))));
