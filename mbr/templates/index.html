@@ -7,6 +7,15 @@
 .feed { position: absolute; top: 48px; bottom: 0; left: 0; right: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 4px; }
 .feed::after { content: ""; position: sticky; display: block; bottom: 0; height: 40px; margin-top: -40px; background: linear-gradient(transparent, var(--bg)); pointer-events: none; }
 .more-row { margin-top: 16px; }
+.col-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+.col-head h2 { margin: 0; }
+.search { position: relative; flex: 0 1 240px; }
+.search svg { position: absolute; left: 12px; top: 50%; width: 14px; height: 14px; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.search input { width: 100%; font: 14px var(--sans); color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px 8px 32px; outline: none; }
+.search input::placeholder { color: var(--muted); }
+.search input:focus { border-color: var(--muted); }
+.search input::-webkit-search-cancel-button { cursor: pointer; }
+.no-match { color: var(--muted); font-size: 14px; margin: 4px 0 0; }
 .notable-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
 .notable-list.masonry { display: flex; align-items: flex-start; }
 .notable-list.masonry > .col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
@@ -59,6 +68,7 @@
 @media (max-width: 900px) {
   .split { grid-template-columns: minmax(0, 1fr); }
   .split h2.col-title { display: none; }
+  .search { flex: 1; }
   .tabs { display: flex; }
   .side { min-height: 0; }
   .feed { position: static; overflow: visible; }
@@ -89,10 +99,13 @@
   </div>
   <div class="split">
     <div id="models">
-      <h2 class="col-title">Reports per Model</h2>
+      <div class="col-head">
+        <h2 class="col-title">Reports per Model</h2>
+        <label class="search"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg><input type="search" id="model-search" placeholder="Filter models or behaviors" aria-label="Filter models" autocomplete="off"></label>
+      </div>
       <div class="models">
         {% for m in models %}
-        <article class="mc{{ ' hidden' if loop.index > 16 }}" style="--c:{{ m.color }}">
+        <article class="mc{{ ' hidden' if loop.index > 16 }}" style="--c:{{ m.color }}" data-q="{{ [m.name, m.summary.one_liner if m.summary, m.summary.aggregate if m.summary]|select|join(' ')|lower }}">
           <div class="mc-top">
             <a class="mc-name" href="/model/{{ m.slug }}/">{{ m.name }}</a>
             <span class="mc-n">{{ m.n }} reports</span>
@@ -113,6 +126,7 @@
         </article>
         {% endfor %}
       </div>
+      <p class="no-match hidden" id="no-match">No models match.</p>
       {% if models|length > 16 %}<div class="more-row"><button class="btn" id="models-more">Show more models</button></div>{% endif %}
     </div>
     <aside class="side tab-off" id="latest">
@@ -179,11 +193,24 @@
     for (var i = 0; i < Math.min(10, hidden.length); i++) hidden[i].classList.remove("hidden");
     if (hidden.length <= 10) pm.remove();
   });
-  var mm = document.getElementById("models-more");
-  if (mm) mm.addEventListener("click", function () {
-    document.querySelectorAll(".models > .mc.hidden").forEach(function (c) { c.classList.remove("hidden"); });
-    mm.remove();
-  });
+  // Model filter: a card matches when every typed word is in its name or summary.
+  // While filtering, all models are searched; clearing restores the first 16.
+  var mm = document.getElementById("models-more"), expanded = false;
+  var cards = Array.prototype.slice.call(document.querySelectorAll(".models > .mc"));
+  var search = document.getElementById("model-search");
+  function filter() {
+    var words = search.value.toLowerCase().trim().split(/\s+/).filter(Boolean), n = 0;
+    cards.forEach(function (c, i) {
+      var show = words.length ? words.every(function (w) { return c.dataset.q.indexOf(w) >= 0; }) : expanded || i < 16;
+      c.classList.toggle("hidden", !show);
+      if (show) n++;
+    });
+    document.getElementById("no-match").classList.toggle("hidden", n > 0);
+    if (mm) mm.parentNode.classList.toggle("hidden", words.length > 0 || expanded);
+  }
+  search.addEventListener("input", filter);
+  search.addEventListener("keydown", function (e) { if (e.key === "Escape") { search.value = ""; filter(); } });
+  if (mm) mm.addEventListener("click", function () { expanded = true; filter(); });
   var more = document.getElementById("notable-more");
   if (more) more.addEventListener("click", function () {
     var hidden = items.filter(function (it) { return it.classList.contains("hidden"); });
